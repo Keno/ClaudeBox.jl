@@ -5,6 +5,8 @@ using JLLPrefixes
 using Scratch
 using NodeJS_22_jll
 
+export main
+
 # Terminal colors
 const GREEN = "\033[32m"
 const YELLOW = "\033[33m"
@@ -33,13 +35,13 @@ mutable struct AppState
 end
 
 """
-    julia_main()::Cint
+    main(args=ARGS)
 
-Main entry point for the ClaudeSandbox application.
+Main entry point for the ClaudeBox application.
 """
-function julia_main()::Cint
+function main(args::Vector{String}=ARGS)::Cint
     try
-        return main(ARGS)
+        return _main(args)
     catch e
         if e isa InterruptException
             cprintln(YELLOW, "\nSession interrupted.")
@@ -51,7 +53,7 @@ function julia_main()::Cint
     end
 end
 
-function main(args::Vector{String})::Cint
+function _main(args::Vector{String})::Cint
     # Parse command line arguments
     options = parse_args(args)
 
