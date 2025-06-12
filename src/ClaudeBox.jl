@@ -268,7 +268,7 @@ function setup_environment!(state::AppState)
 
                 # Workaround for https://github.com/anthropics/claude-code/issues/927
                 # The UID check gives wrong values in sandboxed environments
-                cli_path = "/opt/npm/lib/node_modules/@anthropic-ai/claude-code/claude-code/cli.js"
+                cli_path = "/opt/npm/lib/node_modules/@anthropic-ai/claude-code/cli.js"
                 run(exe, config, `/bin/sh -c "sed -i 's/process\\.getuid()===0/false/g' $cli_path"`)
 
                 cprintln(GREEN, "✓ claude-code installed successfully!")
