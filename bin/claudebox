@@ -1,8 +1,6 @@
-#!/usr/bin/env -S julia --color=yes --startup-file=no
+#!/usr/bin/env -S julia --project=@script/.. --color=yes --startup-file=no
 
 # This is the entry point script for the ClaudeBox
 # It follows the Pkg.jl app format convention
 
 using ClaudeBox
-
-@main

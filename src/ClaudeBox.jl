@@ -39,7 +39,7 @@ end
 
 Main entry point for the ClaudeBox application.
 """
-function main(args::Vector{String}=ARGS)::Cint
+function (@main)(args::Vector{String})::Cint
     try
         return _main(args)
     catch e
@@ -224,7 +224,7 @@ function setup_environment!(state::AppState)
     mkpath(joinpath(state.npm_dir, "lib"))
     mkpath(joinpath(state.npm_dir, "cache"))
     mkpath(state.claude_home_dir)
-    
+
     # Create claude.json file if it doesn't exist
     claude_json_path = joinpath(state.prefix_dir, "claude.json")
     if !isfile(claude_json_path)
@@ -357,7 +357,7 @@ function run_sandbox(state::AppState)
         println("\n💡 To install claude-code:")
         println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
     end
-    
+
     cmd = `/bin/bash --login`
 
     println()
@@ -379,7 +379,7 @@ alias ll='ls -la'
 alias la='ls -A'
 alias l='ls -CF'
 """
-            
+
             # Add auto-launch for claude if installed
             if state.claude_installed
                 bashrc_content *= """
@@ -394,7 +394,7 @@ if [ -z "\$CLAUDE_LAUNCHED" ]; then
 fi
 """
             end
-            
+
             run(exe, config, `/bin/sh -c "cat > /root/.bashrc << 'EOF'
 $bashrc_content
 EOF"`)
