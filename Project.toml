@@ -19,6 +19,5 @@ NodeJS_22_jll = "22"
 Sandbox = "2.1"
 Scratch = "1.2"
 
-[app]
-name = "claudebox"
-primary = true
+[apps]
+claudebox = {}
