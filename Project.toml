@@ -1,0 +1,24 @@
+name = "ClaudeBox"
+uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
+version = "1.0.0"
+authors = ["Claude Assistant"]
+
+[deps]
+JLLPrefixes = "afc68a34-7891-4c5a-9da1-1c62935e7b0d"
+NodeJS_22_jll = "8fca9ca2-e7a1-5ccf-8c05-43be5a78664f"
+Sandbox = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
+Scratch = "6c6a2e73-6563-6170-7368-637461726353"
+
+[sources]
+Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}
+
+[compat]
+julia = "1.6"
+JLLPrefixes = "0.3"
+NodeJS_22_jll = "22"
+Sandbox = "2.1"
+Scratch = "1.2"
+
+[app]
+name = "claudebox"
+primary = true

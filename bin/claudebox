@@ -1,0 +1,15 @@
+#!/usr/bin/env -S julia --color=yes --startup-file=no
+
+# This is the entry point script for the ClaudeBox
+# It follows the Pkg.jl app format convention
+
+# Get the directory where this script lives
+const SCRIPT_DIR = dirname(@__FILE__)
+const APP_DIR = dirname(SCRIPT_DIR)
+
+# Add the app directory to LOAD_PATH and run
+push!(LOAD_PATH, APP_DIR)
+
+# Load and run the app
+using ClaudeBox
+exit(ClaudeBox.julia_main())
