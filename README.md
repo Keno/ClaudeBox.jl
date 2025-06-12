@@ -130,4 +130,4 @@ sysctl kernel.unprivileged_userns_clone
 
 ## License
 
-This application uses the same license as the Sandbox.jl package.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
