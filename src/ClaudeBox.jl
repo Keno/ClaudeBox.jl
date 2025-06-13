@@ -429,7 +429,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
-        "/etc/gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadOnly)
+        "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite)
     )
 
     # Add resolv.conf for DNS resolution if it exists
