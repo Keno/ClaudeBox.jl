@@ -526,6 +526,44 @@ function run_sandbox(state::AppState)
 
     # Run the sandbox
     Sandbox.with_executor() do exe
+        # Create CLAUDE.md in the sandbox root
+        claude_md_content = """
+# ClaudeBox Sandbox Environment
+
+You are running inside a ClaudeBox sandbox - a secure, isolated environment.
+
+## Environment Details
+
+- **Workspace**: Your files are mounted at `/workspace`
+- **Isolation**: This is a sandboxed environment with limited system access
+- **Tools Available**:
+  - Node.js and npm for JavaScript development
+  - Git for version control
+  - GitHub CLI (gh) for GitHub operations
+  - Standard Unix tools
+
+## Important Notes
+
+- You have full read/write access to `/workspace`
+- System directories are read-only or overlayed
+- Network access is available
+- The environment resets when you exit (except for `/workspace`)
+
+## GitHub Integration
+
+$(isempty(state.github_token) ? "- No GitHub authentication configured" : "- GitHub authenticated - you can use git and gh commands")
+
+## Tips
+
+- Use the workspace directory for all file operations
+- Git commits will use the configured user name and email
+- The sandbox provides a consistent, clean environment
+"""
+        
+        run(exe, config, `/bin/sh -c "cat > /CLAUDE.md << 'EOF'
+$claude_md_content
+EOF"`)
+        
         # Create a nice prompt and ensure PATH is set for bash
         if cmd.exec[1] == "/bin/bash"
             # Base bashrc content
