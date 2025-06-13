@@ -4,6 +4,11 @@ using Sandbox
 using JLLPrefixes
 using Scratch
 using NodeJS_22_jll
+using gh_cli_jll
+using Git_jll
+
+include("github_auth.jl")
+using .GitHubAuth
 
 export main
 
@@ -28,10 +33,13 @@ mutable struct AppState
     prefix_dir::String
     nodejs_dir::String
     npm_dir::String
+    gh_cli_dir::String
+    git_dir::String
     claude_home_dir::String
     work_dir::String
     claude_installed::Bool
     api_key_set::Bool
+    github_token::String
 end
 
 """
@@ -78,6 +86,18 @@ function _main(args::Vector{String})::Cint
     # Initialize application state
     state = initialize_state(options["work_dir"])
 
+    # Handle GitHub authentication if requested
+    if options["github_auth"]
+        token = GitHubAuth.authenticate()
+        if GitHubAuth.validate_token(token)
+            state.github_token = token
+            cprintln(GREEN, "GitHub token will be passed to sandbox as GITHUB_TOKEN")
+        else
+            cprintln(RED, "Failed to authenticate with GitHub")
+            return 1
+        end
+    end
+
     # Check prerequisites
     if !check_prerequisites(state)
         cprintln(YELLOW, "\nProceeding without API key...")
@@ -98,7 +118,8 @@ function parse_args(args::Vector{String})
         "help" => false,
         "version" => false,
         "reset" => false,
-        "work_dir" => pwd()
+        "work_dir" => pwd(),
+        "github_auth" => false
     )
 
     i = 1
@@ -110,6 +131,8 @@ function parse_args(args::Vector{String})
             options["version"] = true
         elseif arg == "--reset"
             options["reset"] = true
+        elseif arg == "--github-auth"
+            options["github_auth"] = true
         elseif arg in ["--work-dir", "-w"]
             if i < length(args)
                 i += 1
@@ -154,6 +177,7 @@ function print_help()
         -v, --version       Show version information
         -w, --work-dir DIR  Directory to mount as /workspace (default: current)
         --reset             Reset the sandbox environment
+        --github-auth       Authenticate with GitHub using device flow
 
     $(BOLD)ENVIRONMENT:$(RESET)
         ANTHROPIC_API_KEY   Your Anthropic API key (required for claude-code)
@@ -172,6 +196,8 @@ function print_help()
         Your files are mounted at: /workspace
         Node.js is available at: /opt/nodejs/bin/node
         NPM is available at: /opt/nodejs/bin/npm
+        Git is available at: /opt/git/bin/git
+        GitHub CLI is available at: /opt/gh_cli/bin/gh
         Claude-code is automatically installed on first run
     """)
 end
@@ -180,6 +206,8 @@ function initialize_state(work_dir::String)::AppState
     prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
     nodejs_dir = joinpath(prefix, "nodejs")
     npm_dir = joinpath(prefix, "npm")
+    gh_cli_dir = joinpath(prefix, "gh_cli")
+    git_dir = joinpath(prefix, "git")
     claude_home_dir = joinpath(prefix, "claude_home")
 
     # Check if claude is installed
@@ -189,7 +217,10 @@ function initialize_state(work_dir::String)::AppState
     # Check API key
     api_key_set = !isempty(get(ENV, "ANTHROPIC_API_KEY", ""))
 
-    return AppState(prefix, nodejs_dir, npm_dir, claude_home_dir, work_dir, claude_installed, api_key_set)
+    # Initialize with empty GitHub token
+    github_token = ""
+
+    return AppState(prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, claude_home_dir, work_dir, claude_installed, api_key_set, github_token)
 end
 
 function check_prerequisites(state::AppState)::Bool
@@ -223,6 +254,8 @@ function setup_environment!(state::AppState)
     mkpath(joinpath(state.npm_dir, "bin"))
     mkpath(joinpath(state.npm_dir, "lib"))
     mkpath(joinpath(state.npm_dir, "cache"))
+    mkpath(state.gh_cli_dir)
+    mkpath(state.git_dir)
     mkpath(state.claude_home_dir)
 
     # Create claude.json file if it doesn't exist
@@ -241,6 +274,24 @@ function setup_environment!(state::AppState)
         cprintln(GREEN, "  ✓ Node.js installed")
     else
         cprintln(GREEN, " Done!")
+    end
+
+    # Check if gh CLI is installed
+    gh_bin = joinpath(state.gh_cli_dir, "bin", "gh")
+    if !isfile(gh_bin)
+        cprintln(YELLOW, "  Installing GitHub CLI...")
+        artifact_paths = collect_artifact_paths(["gh_cli_jll"])
+        deploy_artifact_paths(state.gh_cli_dir, artifact_paths)
+        cprintln(GREEN, "  ✓ GitHub CLI installed")
+    end
+
+    # Check if Git is installed
+    git_bin = joinpath(state.git_dir, "bin", "git")
+    if !isfile(git_bin)
+        cprintln(YELLOW, "  Installing Git...")
+        artifact_paths = collect_artifact_paths(["Git_jll"])
+        deploy_artifact_paths(state.git_dir, artifact_paths)
+        cprintln(GREEN, "  ✓ Git installed")
     end
 
     # Check if claude is installed
@@ -294,6 +345,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/" => Sandbox.MountInfo(Sandbox.debian_rootfs(), Sandbox.MountType.Overlayed),
         "/opt/nodejs" => Sandbox.MountInfo(state.nodejs_dir, Sandbox.MountType.ReadOnly),
         "/opt/npm" => Sandbox.MountInfo(state.npm_dir, Sandbox.MountType.ReadWrite),
+        "/opt/gh_cli" => Sandbox.MountInfo(state.gh_cli_dir, Sandbox.MountType.ReadOnly),
+        "/opt/git" => Sandbox.MountInfo(state.git_dir, Sandbox.MountType.ReadOnly),
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.prefix_dir, "claude.json"), Sandbox.MountType.ReadWrite)
@@ -315,13 +368,14 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         mounts,
         # Environment
         Dict(
-            "PATH" => "/opt/npm/bin:/opt/nodejs/bin:/usr/bin:/bin",
+            "PATH" => "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/usr/bin:/bin",
             "HOME" => "/root",
             "NODE_PATH" => "/opt/npm/lib/node_modules",
             "npm_config_prefix" => "/opt/npm",
             "npm_config_cache" => "/opt/npm/cache",
             "npm_config_userconfig" => "/opt/npm/.npmrc",
             "ANTHROPIC_API_KEY" => get(ENV, "ANTHROPIC_API_KEY", ""),
+            "GITHUB_TOKEN" => state.github_token,
             "TERM" => get(ENV, "TERM", "xterm-256color"),
             "LANG" => "C.UTF-8",
             "USER" => "root"
@@ -354,6 +408,8 @@ function run_sandbox(state::AppState)
         println("\n📦 Available tools:")
         println("   $(BOLD)node$(RESET)  - Node.js v22")
         println("   $(BOLD)npm$(RESET)   - Node Package Manager")
+        println("   $(BOLD)git$(RESET)   - Git version control")
+        println("   $(BOLD)gh$(RESET)    - GitHub CLI")
         println("\n💡 To install claude-code:")
         println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
     end
@@ -372,7 +428,7 @@ function run_sandbox(state::AppState)
             bashrc_content = """
 # Claude Sandbox environment
 export PS1="\\[\\033[32m\\][sandbox]\\[\\033[0m\\] \\w \\\$ "
-export PATH="/opt/npm/bin:/opt/nodejs/bin:/usr/bin:/bin:/usr/local/bin"
+export PATH="/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/usr/bin:/bin:/usr/local/bin"
 
 # Helpful aliases
 alias ll='ls -la'
