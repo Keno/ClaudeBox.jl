@@ -1,35 +1,37 @@
 using Test
-using ClaudeSandboxApp
+using ClaudeBox
 
-@testset "ClaudeSandboxApp Tests" begin
+@testset "ClaudeBox Tests" begin
     @testset "Argument Parsing" begin
         # Test help parsing
-        options = ClaudeSandboxApp.parse_args(String["--help"])
+        options = ClaudeBox.parse_args(String["--help"])
         @test options["help"] == true
         
         # Test version parsing
-        options = ClaudeSandboxApp.parse_args(String["--version"])
+        options = ClaudeBox.parse_args(String["--version"])
         @test options["version"] == true
         
         # Test reset parsing
-        options = ClaudeSandboxApp.parse_args(String["--reset"])
+        options = ClaudeBox.parse_args(String["--reset"])
         @test options["reset"] == true
         
         # Test work directory parsing
-        options = ClaudeSandboxApp.parse_args(String["-w", "/tmp"])
+        options = ClaudeBox.parse_args(String["-w", "/tmp"])
         @test options["work_dir"] == "/tmp"
         
         # Test default work directory
-        options = ClaudeSandboxApp.parse_args(String[])
+        options = ClaudeBox.parse_args(String[])
         @test options["work_dir"] == pwd()
     end
     
     @testset "State Initialization" begin
         # Test state creation
-        state = ClaudeSandboxApp.initialize_state(pwd())
-        @test state isa ClaudeSandboxApp.AppState
-        @test isdir(state.prefix_dir)
+        state = ClaudeBox.initialize_state(pwd())
+        @test state isa ClaudeBox.AppState
+        @test isdir(state.tools_prefix)
+        @test isdir(state.claude_prefix)
         @test state.work_dir == pwd()
+        @test state.claude_args == String[]
     end
 end
 

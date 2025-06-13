@@ -23,7 +23,8 @@ const RESET = "\033[0m"
 const BOLD = "\033[1m"
 
 # Constants
-const CLAUDE_SCRATCH_KEY = "claude_code_sandbox_app"
+const TOOLS_SCRATCH_KEY = "claude_code_sandbox_tools"
+const CLAUDE_SCRATCH_KEY = "claude_code_sandbox_settings"
 const VERSION = "1.0.0"
 
 # Helper functions for colored output
@@ -31,7 +32,8 @@ cprint(color, text) = print(color, text, RESET)
 cprintln(color, text) = println(color, text, RESET)
 
 mutable struct AppState
-    prefix_dir::String
+    tools_prefix::String
+    claude_prefix::String
     nodejs_dir::String
     npm_dir::String
     gh_cli_dir::String
@@ -39,8 +41,9 @@ mutable struct AppState
     claude_home_dir::String
     work_dir::String
     claude_installed::Bool
-    api_key_set::Bool
     github_token::String
+    claude_args::Vector{String}
+    keep_bash::Bool
 end
 
 """
@@ -57,6 +60,7 @@ function (@main)(args::Vector{String})::Cint
             return 0
         else
             cprintln(RED, "Error: $e")
+            Base.display_error(stderr, e, catch_backtrace())
             return 1
         end
     end
@@ -81,27 +85,47 @@ function _main(args::Vector{String})::Cint
 
     # Reset if requested
     if options["reset"]
-        reset_environment()
+        reset_tools()
+    elseif options["reset_all"]
+        reset_all()
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"])
 
-    # Handle GitHub authentication if requested
-    if options["github_auth"]
-        token = GitHubAuth.authenticate()
-        if GitHubAuth.validate_token(token)
-            state.github_token = token
-            cprintln(GREEN, "GitHub token will be passed to sandbox as GITHUB_TOKEN")
-        else
-            cprintln(RED, "Failed to authenticate with GitHub")
-            return 1
+    # Handle GitHub authentication (enabled by default)
+    if !options["no_github_auth"]
+        # Check if existing token is valid
+        if !isempty(state.github_token)
+            if GitHubAuth.validate_token(state.github_token; silent=true)
+                cprintln(GREEN, "✓ Using existing valid GitHub token")
+            else
+                cprintln(YELLOW, "Existing GitHub token is invalid, requesting new authentication...")
+                state.github_token = ""  # Clear invalid token
+            end
         end
-    end
-
-    # Check prerequisites
-    if !check_prerequisites(state)
-        cprintln(YELLOW, "\nProceeding without API key...")
+        
+        # Authenticate if we don't have a valid token
+        if isempty(state.github_token)
+            println("\n$(BOLD)GitHub Authentication$(RESET)")
+            println("GitHub authentication enables git operations with your repositories.")
+            println("To skip, use --no-github-auth")
+            println()
+            
+            token = GitHubAuth.authenticate()
+            if GitHubAuth.validate_token(token)
+                state.github_token = token
+                save_github_token(state.claude_prefix, token)
+                cprintln(GREEN, "✓ GitHub authenticated and token saved")
+                cprintln(YELLOW, "\n⚠️  Warning: Your GitHub token has been persisted to disk.")
+                println("   It will be automatically used in future sessions.")
+                println("   Use --reset-all to remove the stored token.")
+                println()
+            else
+                cprintln(RED, "Failed to authenticate with GitHub")
+                return 1
+            end
+        end
     end
 
     # Setup environment
@@ -119,8 +143,11 @@ function parse_args(args::Vector{String})
         "help" => false,
         "version" => false,
         "reset" => false,
+        "reset_all" => false,
         "work_dir" => pwd(),
-        "github_auth" => false
+        "no_github_auth" => false,
+        "bash" => false,
+        "claude_args" => String[]
     )
 
     i = 1
@@ -132,8 +159,12 @@ function parse_args(args::Vector{String})
             options["version"] = true
         elseif arg == "--reset"
             options["reset"] = true
-        elseif arg == "--github-auth"
-            options["github_auth"] = true
+        elseif arg == "--reset-all"
+            options["reset_all"] = true
+        elseif arg == "--no-github-auth"
+            options["no_github_auth"] = true
+        elseif arg == "--bash"
+            options["bash"] = true
         elseif arg in ["--work-dir", "-w"]
             if i < length(args)
                 i += 1
@@ -148,9 +179,13 @@ function parse_args(args::Vector{String})
                 exit(1)
             end
         else
-            cprintln(RED, "Unknown option: $arg")
-            print_help()
-            exit(1)
+            # Collect unrecognized arguments to pass to claude
+            push!(options["claude_args"], arg)
+            # If this looks like a flag with a value, grab the next arg too
+            if startswith(arg, "-") && i < length(args) && !startswith(args[i+1], "-")
+                i += 1
+                push!(options["claude_args"], args[i])
+            end
         end
         i += 1
     end
@@ -177,11 +212,12 @@ function print_help()
         -h, --help          Show this help message
         -v, --version       Show version information
         -w, --work-dir DIR  Directory to mount as /workspace (default: current)
-        --reset             Reset the sandbox environment
-        --github-auth       Authenticate with GitHub using device flow
+        --reset             Reset tools (Node.js, npm, git, gh) but keep Claude settings
+        --reset-all         Reset everything including Claude settings
+        --no-github-auth    Skip GitHub authentication (enabled by default)
+        --bash              Keep bash shell open after claude exits
 
-    $(BOLD)ENVIRONMENT:$(RESET)
-        ANTHROPIC_API_KEY   Your Anthropic API key (required for claude-code)
+    Unrecognized flags are passed through to the claude command.
 
     $(BOLD)EXAMPLES:$(RESET)
         # Run with current directory
@@ -193,6 +229,10 @@ function print_help()
         # Reset environment
         claudebox --reset
 
+        # Pass arguments to claude
+        claudebox --model claude-3-sonnet-20240229
+        claudebox --continue
+
     $(BOLD)INSIDE THE SANDBOX:$(RESET)
         Your files are mounted at: /workspace
         Node.js is available at: /opt/nodejs/bin/node
@@ -203,48 +243,55 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String)::AppState
-    prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
-    nodejs_dir = joinpath(prefix, "nodejs")
-    npm_dir = joinpath(prefix, "npm")
-    gh_cli_dir = joinpath(prefix, "gh_cli")
-    git_dir = joinpath(prefix, "git")
-    claude_home_dir = joinpath(prefix, "claude_home")
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false)::AppState
+    tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
+    claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
+    
+    nodejs_dir = joinpath(tools_prefix, "nodejs")
+    npm_dir = joinpath(tools_prefix, "npm")
+    gh_cli_dir = joinpath(tools_prefix, "gh_cli")
+    git_dir = joinpath(tools_prefix, "git")
+    claude_home_dir = joinpath(claude_prefix, "claude_home")
 
     # Check if claude is installed
     claude_bin = joinpath(npm_dir, "bin", "claude")
     claude_installed = isfile(claude_bin)
 
-    # Check API key
-    api_key_set = !isempty(get(ENV, "ANTHROPIC_API_KEY", ""))
+    # Load existing GitHub token if available
+    github_token = load_github_token(claude_prefix)
 
-    # Initialize with empty GitHub token
-    github_token = ""
-
-    return AppState(prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, claude_home_dir, work_dir, claude_installed, api_key_set, github_token)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, claude_home_dir, work_dir, claude_installed, github_token, claude_args, keep_bash)
 end
 
-function check_prerequisites(state::AppState)::Bool
-    println("Checking prerequisites...")
 
-    if state.api_key_set
-        cprintln(GREEN, "  ✓ ANTHROPIC_API_KEY is set")
-    else
-        cprintln(YELLOW, "  ⚠ ANTHROPIC_API_KEY not set")
-        println("    You can use console authentication or set an API key:")
-        println("    export ANTHROPIC_API_KEY=your-key")
-        println("    Get a key at: https://console.anthropic.com/")
+function reset_tools()
+    cprintln(YELLOW, "Resetting tools (keeping Claude settings)...")
+    scratch_path = scratch_dir(TOOLS_SCRATCH_KEY)
+    if isdir(scratch_path)
+        rm(scratch_path; recursive=true, force=true)
     end
-
+    cprintln(GREEN, "✓ Tools reset complete")
     println()
-    return state.api_key_set
 end
 
-function reset_environment()
-    cprintln(YELLOW, "Resetting sandbox environment...")
+function reset_all()
+    cprintln(YELLOW, "Resetting everything (tools and Claude settings)...")
     clear_scratchspaces!(@__MODULE__)
-    cprintln(GREEN, "✓ Environment reset complete")
+    cprintln(GREEN, "✓ Full reset complete")
     println()
+end
+
+function save_github_token(claude_prefix::String, token::String)
+    token_file = joinpath(claude_prefix, "github_token")
+    write(token_file, token)
+end
+
+function load_github_token(claude_prefix::String)::String
+    token_file = joinpath(claude_prefix, "github_token")
+    if isfile(token_file)
+        return strip(read(token_file, String))
+    end
+    return ""
 end
 
 function setup_environment!(state::AppState)
@@ -260,20 +307,39 @@ function setup_environment!(state::AppState)
     mkpath(state.claude_home_dir)
 
     # Create claude.json file if it doesn't exist
-    claude_json_path = joinpath(state.prefix_dir, "claude.json")
+    claude_json_path = joinpath(state.claude_prefix, "claude.json")
     if !isfile(claude_json_path)
         write(claude_json_path, "{}")
     end
 
-    # Create a global gitconfig with SSL settings
-    gitconfig_path = joinpath(state.prefix_dir, "gitconfig")
-    if !isfile(gitconfig_path)
+    # Create a global gitconfig with SSL settings and user info
+    gitconfig_path = joinpath(state.tools_prefix, "gitconfig")
+    if !isfile(gitconfig_path) || !isempty(state.github_token)
+        # Get user info from GitHub if we have a token
+        user_name = "Sandbox User"
+        user_email = "sandbox@localhost"
+        
+        if !isempty(state.github_token)
+            user_info = GitHubAuth.get_user_info(state.github_token)
+            if !isnothing(user_info.name) && !isempty(user_info.name)
+                user_name = user_info.name
+            elseif !isnothing(user_info.login) && !isempty(user_info.login)
+                user_name = user_info.login
+            end
+            
+            if !isnothing(user_info.email) && !isempty(user_info.email)
+                user_email = user_info.email
+            elseif !isnothing(user_info.login) && !isempty(user_info.login)
+                user_email = "$(user_info.login)@users.noreply.github.com"
+            end
+        end
+        
         write(gitconfig_path, """
 [http]
     sslCAInfo = /etc/ssl/certs/ca-certificates.crt
 [user]
-    name = Sandbox User
-    email = sandbox@localhost
+    name = $user_name
+    email = $user_email
 """)
     end
 
@@ -362,13 +428,13 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/opt/git" => Sandbox.MountInfo(state.git_dir, Sandbox.MountType.ReadOnly),
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
-        "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.prefix_dir, "claude.json"), Sandbox.MountType.ReadWrite),
-        "/etc/gitconfig" => Sandbox.MountInfo(joinpath(state.prefix_dir, "gitconfig"), Sandbox.MountType.ReadOnly)
+        "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
+        "/etc/gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadOnly)
     )
 
     # Add resolv.conf for DNS resolution if it exists
     if isfile("/etc/resolv.conf")
-        resolv_conf_copy = joinpath(state.prefix_dir, "resolv.conf")
+        resolv_conf_copy = joinpath(state.tools_prefix, "resolv.conf")
         try
             cp("/etc/resolv.conf", resolv_conf_copy; force=true, follow_symlinks=true)
             mounts["/etc/resolv.conf"] = Sandbox.MountInfo(resolv_conf_copy, Sandbox.MountType.ReadOnly)
@@ -381,7 +447,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
     cacert_file = MozillaCACerts_jll.cacert
     if isfile(cacert_file)
         # Copy the certificate to scratch space
-        ssl_certs_dir = joinpath(state.prefix_dir, "ssl_certs")
+        ssl_certs_dir = joinpath(state.tools_prefix, "ssl_certs")
         mkpath(ssl_certs_dir)
         cacert_copy = joinpath(ssl_certs_dir, "ca-certificates.crt")
         cp(cacert_file, cacert_copy; force=true)
@@ -436,9 +502,10 @@ function run_sandbox(state::AppState)
     if state.claude_installed
         println("\n🤖 Starting $(BOLD)claude$(RESET) interactive session...")
         println("   Type your prompts and claude will respond")
-        println("   Use $(BOLD)exit$(RESET) to return to bash shell")
-        if !state.api_key_set
-            cprintln(YELLOW, "\n⚠  No ANTHROPIC_API_KEY detected - using console authentication")
+        if state.keep_bash
+            println("   Use $(BOLD)exit$(RESET) to return to bash shell")
+        else
+            println("   Use $(BOLD)exit$(RESET) to leave the sandbox")
         end
     else
         println("\n🐚 Starting $(BOLD)bash$(RESET) shell...")
@@ -475,17 +542,36 @@ alias l='ls -CF'
 
             # Add auto-launch for claude if installed
             if state.claude_installed
-                bashrc_content *= """
+                # Prepare claude args as a shell-escaped string
+                claude_args_str = ""
+                if !isnothing(state.claude_args) && !isempty(state.claude_args)
+                    claude_args_str = " " * join(["\$(printf '%q' '$arg')" for arg in state.claude_args], " ")
+                end
+                
+                if state.keep_bash
+                    bashrc_content *= """
 
 # Auto-launch claude
 if [ -z "\$CLAUDE_LAUNCHED" ]; then
     export CLAUDE_LAUNCHED=1
     cd /workspace
-    claude --dangerously-skip-permissions
+    claude --dangerously-skip-permissions$claude_args_str
     echo ""
     echo "🐚 Returned to bash shell. Run 'claude --dangerously-skip-permissions' to start claude again."
 fi
 """
+                else
+                    bashrc_content *= """
+
+# Auto-launch claude and exit
+if [ -z "\$CLAUDE_LAUNCHED" ]; then
+    export CLAUDE_LAUNCHED=1
+    cd /workspace
+    claude --dangerously-skip-permissions$claude_args_str
+    exit
+fi
+"""
+                end
             end
 
             run(exe, config, `/bin/sh -c "cat > /root/.bashrc << 'EOF'

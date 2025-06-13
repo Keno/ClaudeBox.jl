@@ -94,7 +94,7 @@ function authenticate()
     return token_response.access_token
 end
 
-function validate_token(token::String)
+function validate_token(token::String; silent::Bool=false)
     try
         # Make a simple API call to validate the token
         response = HTTP.get(
@@ -104,15 +104,40 @@ function validate_token(token::String)
         
         if response.status == 200
             user_data = JSON.parse(String(response.body))
-            println("Authenticated as: $(user_data["login"])")
+            if !silent
+                println("Authenticated as: $(user_data["login"])")
+            end
             return true
         else
             return false
         end
     catch e
-        println("Token validation failed: $e")
+        if !silent
+            println("Token validation failed: $e")
+        end
         return false
     end
+end
+
+function get_user_info(token::String)
+    try
+        response = HTTP.get(
+            "https://api.github.com/user",
+            ["Authorization" => "Bearer $token", "Accept" => "application/vnd.github.v3+json"]
+        )
+        
+        if response.status == 200
+            user_data = JSON.parse(String(response.body))
+            return (
+                login = something(get(user_data, "login", nothing), ""),
+                name = something(get(user_data, "name", nothing), ""),
+                email = something(get(user_data, "email", nothing), "")
+            )
+        end
+    catch e
+        # Return empty values on error
+    end
+    return (login = "", name = "", email = "")
 end
 
 end # module
