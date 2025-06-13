@@ -6,6 +6,7 @@ using Scratch
 using NodeJS_22_jll
 using gh_cli_jll
 using Git_jll
+using MozillaCACerts_jll
 
 include("github_auth.jl")
 using .GitHubAuth
@@ -264,6 +265,18 @@ function setup_environment!(state::AppState)
         write(claude_json_path, "{}")
     end
 
+    # Create a global gitconfig with SSL settings
+    gitconfig_path = joinpath(state.prefix_dir, "gitconfig")
+    if !isfile(gitconfig_path)
+        write(gitconfig_path, """
+[http]
+    sslCAInfo = /etc/ssl/certs/ca-certificates.crt
+[user]
+    name = Sandbox User
+    email = sandbox@localhost
+""")
+    end
+
     # Check if Node.js is installed
     node_bin = joinpath(state.nodejs_dir, "bin", "node")
     if !isfile(node_bin)
@@ -349,7 +362,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/opt/git" => Sandbox.MountInfo(state.git_dir, Sandbox.MountType.ReadOnly),
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
-        "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.prefix_dir, "claude.json"), Sandbox.MountType.ReadWrite)
+        "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.prefix_dir, "claude.json"), Sandbox.MountType.ReadWrite),
+        "/etc/gitconfig" => Sandbox.MountInfo(joinpath(state.prefix_dir, "gitconfig"), Sandbox.MountType.ReadOnly)
     )
 
     # Add resolv.conf for DNS resolution if it exists
@@ -363,12 +377,30 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         end
     end
 
+    # Add CA certificates for HTTPS connections
+    cacert_file = MozillaCACerts_jll.cacert
+    if isfile(cacert_file)
+        # Copy the certificate to scratch space
+        ssl_certs_dir = joinpath(state.prefix_dir, "ssl_certs")
+        mkpath(ssl_certs_dir)
+        cacert_copy = joinpath(ssl_certs_dir, "ca-certificates.crt")
+        cp(cacert_file, cacert_copy; force=true)
+        
+        # Also create a ca-bundle.crt symlink (some tools look for this)
+        ca_bundle_link = joinpath(ssl_certs_dir, "ca-bundle.crt")
+        rm(ca_bundle_link; force=true)
+        symlink("ca-certificates.crt", ca_bundle_link)
+        
+        # Mount the directory
+        mounts["/etc/ssl/certs"] = Sandbox.MountInfo(ssl_certs_dir, Sandbox.MountType.ReadOnly)
+    end
+
     Sandbox.SandboxConfig(
         # Mounts
         mounts,
         # Environment
         Dict(
-            "PATH" => "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/usr/bin:/bin",
+            "PATH" => "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/usr/bin:/bin",
             "HOME" => "/root",
             "NODE_PATH" => "/opt/npm/lib/node_modules",
             "npm_config_prefix" => "/opt/npm",
@@ -378,7 +410,12 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
             "GITHUB_TOKEN" => state.github_token,
             "TERM" => get(ENV, "TERM", "xterm-256color"),
             "LANG" => "C.UTF-8",
-            "USER" => "root"
+            "USER" => "root",
+            "SSL_CERT_FILE" => "/etc/ssl/certs/ca-certificates.crt",
+            "SSL_CERT_DIR" => "/etc/ssl/certs",
+            "GIT_SSL_CAINFO" => "/etc/ssl/certs/ca-certificates.crt",
+            "GIT_SSL_CAPATH" => "/etc/ssl/certs",
+            "CURL_CA_BUNDLE" => "/etc/ssl/certs/ca-certificates.crt"
         ); stdin
     )
 end
@@ -428,7 +465,7 @@ function run_sandbox(state::AppState)
             bashrc_content = """
 # Claude Sandbox environment
 export PS1="\\[\\033[32m\\][sandbox]\\[\\033[0m\\] \\w \\\$ "
-export PATH="/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/usr/bin:/bin:/usr/local/bin"
+export PATH="/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/usr/bin:/bin:/usr/local/bin"
 
 # Helpful aliases
 alias ll='ls -la'
