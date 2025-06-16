@@ -8,6 +8,7 @@ using gh_cli_jll
 using Git_jll
 using MozillaCACerts_jll
 using juliaup_jll
+using JSON
 
 include("github_auth.jl")
 using .GitHubAuth
@@ -45,6 +46,7 @@ mutable struct AppState
     work_dir::String
     claude_installed::Bool
     github_token::String
+    github_refresh_token::Union{String, Nothing}
     claude_args::Vector{String}
     keep_bash::Bool
 end
@@ -103,8 +105,25 @@ function _main(args::Vector{String})::Cint
             if GitHubAuth.validate_token(state.github_token; silent=true)
                 cprintln(GREEN, "✓ Using existing valid GitHub token")
             else
-                cprintln(YELLOW, "Existing GitHub token is invalid, requesting new authentication...")
-                state.github_token = ""  # Clear invalid token
+                # Try to refresh the token if we have a refresh token
+                if !isnothing(state.github_refresh_token) && !isempty(state.github_refresh_token)
+                    cprintln(YELLOW, "Access token expired, attempting to refresh...")
+                    refresh_response = GitHubAuth.refresh_access_token(state.github_refresh_token)
+                    if !isnothing(refresh_response)
+                        state.github_token = refresh_response.access_token
+                        state.github_refresh_token = refresh_response.refresh_token
+                        save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
+                        cprintln(GREEN, "✓ GitHub token refreshed successfully")
+                    else
+                        cprintln(YELLOW, "Failed to refresh token, requesting new authentication...")
+                        state.github_token = ""
+                        state.github_refresh_token = nothing
+                    end
+                else
+                    cprintln(YELLOW, "Existing GitHub token is invalid, requesting new authentication...")
+                    state.github_token = ""
+                    state.github_refresh_token = nothing
+                end
             end
         end
 
@@ -115,10 +134,11 @@ function _main(args::Vector{String})::Cint
             println("To skip, use --no-github-auth")
             println()
 
-            token = GitHubAuth.authenticate()
-            if GitHubAuth.validate_token(token)
-                state.github_token = token
-                save_github_token(state.claude_prefix, token)
+            token_response = GitHubAuth.authenticate()
+            if GitHubAuth.validate_token(token_response.access_token)
+                state.github_token = token_response.access_token
+                state.github_refresh_token = token_response.refresh_token
+                save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
                 cprintln(GREEN, "✓ GitHub authenticated and token saved")
                 cprintln(YELLOW, "\n⚠️  Warning: Your GitHub token has been persisted to disk.")
                 println("   It will be automatically used in future sessions.")
@@ -268,10 +288,10 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     claude_bin = joinpath(npm_dir, "bin", "claude")
     claude_installed = isfile(claude_bin)
 
-    # Load existing GitHub token if available
-    github_token = load_github_token(claude_prefix)
+    # Load existing GitHub tokens if available
+    tokens = load_github_tokens(claude_prefix)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, github_token, claude_args, keep_bash)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash)
 end
 
 
@@ -292,17 +312,41 @@ function reset_all()
     println()
 end
 
-function save_github_token(claude_prefix::String, token::String)
-    token_file = joinpath(claude_prefix, "github_token")
-    write(token_file, token)
+function save_github_tokens(claude_prefix::String, access_token::String, refresh_token::Union{String, Nothing}=nothing)
+    token_file = joinpath(claude_prefix, "github_tokens.json")
+    tokens = Dict(
+        "access_token" => access_token,
+        "refresh_token" => refresh_token
+    )
+    write(token_file, JSON.json(tokens))
 end
 
-function load_github_token(claude_prefix::String)::String
-    token_file = joinpath(claude_prefix, "github_token")
+function load_github_tokens(claude_prefix::String)
+    # First check new format
+    token_file = joinpath(claude_prefix, "github_tokens.json")
     if isfile(token_file)
-        return strip(read(token_file, String))
+        try
+            tokens = JSON.parsefile(token_file)
+            return (
+                access_token = get(tokens, "access_token", ""),
+                refresh_token = get(tokens, "refresh_token", nothing)
+            )
+        catch
+            # Fall through to legacy format
+        end
     end
-    return ""
+    
+    # Check legacy format for backward compatibility
+    legacy_file = joinpath(claude_prefix, "github_token")
+    if isfile(legacy_file)
+        token = strip(read(legacy_file, String))
+        # Migrate to new format
+        save_github_tokens(claude_prefix, token, nothing)
+        rm(legacy_file)  # Remove old file
+        return (access_token = token, refresh_token = nothing)
+    end
+    
+    return (access_token = "", refresh_token = nothing)
 end
 
 function setup_environment!(state::AppState)

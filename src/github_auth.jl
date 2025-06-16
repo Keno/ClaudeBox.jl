@@ -20,6 +20,9 @@ struct AccessTokenResponse
     access_token::String
     token_type::String
     scope::String
+    refresh_token::Union{String, Nothing}
+    expires_in::Union{Int, Nothing}
+    refresh_token_expires_in::Union{Int, Nothing}
 end
 
 function request_device_code()
@@ -57,7 +60,10 @@ function poll_for_token(device_code::String, interval::Int)
             return AccessTokenResponse(
                 data["access_token"],
                 data["token_type"],
-                data["scope"]
+                data["scope"],
+                get(data, "refresh_token", nothing),
+                get(data, "expires_in", nothing),
+                get(data, "refresh_token_expires_in", nothing)
             )
         elseif haskey(data, "error")
             if data["error"] == "authorization_pending"
@@ -91,7 +97,7 @@ function authenticate()
     token_response = poll_for_token(device_response.device_code, device_response.interval)
     
     println("\nAuthentication successful!")
-    return token_response.access_token
+    return token_response
 end
 
 function validate_token(token::String; silent::Bool=false)
@@ -138,6 +144,33 @@ function get_user_info(token::String)
         # Return empty values on error
     end
     return (login = "", name = "", email = "")
+end
+
+function refresh_access_token(refresh_token::String)
+    try
+        response = HTTP.post(
+            ACCESS_TOKEN_URL,
+            ["Accept" => "application/json"],
+            "client_id=$(CLIENT_ID)&refresh_token=$(refresh_token)&grant_type=refresh_token"
+        )
+        
+        if response.status == 200
+            data = JSON.parse(String(response.body))
+            if haskey(data, "access_token")
+                return AccessTokenResponse(
+                    data["access_token"],
+                    data["token_type"],
+                    data["scope"],
+                    get(data, "refresh_token", refresh_token),  # May return same or new refresh token
+                    get(data, "expires_in", nothing),
+                    get(data, "refresh_token_expires_in", nothing)
+                )
+            end
+        end
+    catch e
+        # Refresh failed, return nothing
+    end
+    return nothing
 end
 
 end # module
