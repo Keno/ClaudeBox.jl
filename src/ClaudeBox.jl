@@ -57,6 +57,9 @@ end
 Main entry point for the ClaudeBox application.
 """
 function (@main)(args::Vector{String})::Cint
+    # Enable Ctrl+C handling
+    Base.exit_on_sigint(false)
+    
     try
         return _main(args)
     catch e
