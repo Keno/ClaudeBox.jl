@@ -9,6 +9,7 @@ using Git_jll
 using MozillaCACerts_jll
 using juliaup_jll
 using JSON
+using HTTP
 
 include("github_auth.jl")
 using .GitHubAuth
@@ -163,6 +164,9 @@ function _main(args::Vector{String})::Cint
             catch e
                 if isa(e, InterruptException)
                     cprintln(YELLOW, "\nGitHub authentication skipped. Proceeding without GitHub access.")
+                    println()
+                elseif isa(e, HTTP.RequestError) && isa(e.error, InterruptException)
+                    cprintln(YELLOW, "\nGitHub authentication interrupted. Proceeding without GitHub access.")
                     println()
                 else
                     rethrow(e)
