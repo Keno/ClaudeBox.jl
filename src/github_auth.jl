@@ -80,14 +80,6 @@ function poll_for_token(device_code::String, interval::Int)
 end
 
 function authenticate()
-    println("\n🔐 GitHub Authorization Request")
-    println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    println("This will securely authorize access to your GitHub repositories")
-    println("without requiring a full personal access token. The app will only")
-    println("have access to repositories you explicitly grant permission to.")
-    println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    
-    println("\nRequesting device code...")
     device_response = request_device_code()
     
     println("\nPlease visit: $(device_response.verification_uri)")

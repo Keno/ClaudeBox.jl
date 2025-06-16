@@ -131,10 +131,14 @@ function _main(args::Vector{String})::Cint
 
         # Authenticate if we don't have a valid token
         if isempty(state.github_token)
-            println("\n$(BOLD)GitHub Authentication$(RESET)")
-            println("GitHub authentication enables git operations with your repositories.")
-            println("To skip, use --no-github-auth")
+            println("\n🔐 $(BOLD)GitHub Authentication$(RESET)")
+            println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            println("This will securely authorize access to your GitHub repositories")
+            println("without requiring a full personal access token. The app will only")
+            println("have access to repositories you explicitly grant permission to.")
             println()
+            println("To skip authentication, use --no-github-auth")
+            println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
             token_response = GitHubAuth.authenticate()
             if GitHubAuth.validate_token(token_response.access_token)
