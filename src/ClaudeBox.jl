@@ -113,7 +113,9 @@ function _main(args::Vector{String})::Cint
                         state.github_token = refresh_response.access_token
                         state.github_refresh_token = refresh_response.refresh_token
                         save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
+                        token_path = joinpath(state.claude_prefix, "github_tokens.json")
                         cprintln(GREEN, "✓ GitHub token refreshed successfully")
+                        cprintln(CYAN, "   Token location: $(token_path)")
                     else
                         cprintln(YELLOW, "Failed to refresh token, requesting new authentication...")
                         state.github_token = ""
@@ -139,8 +141,10 @@ function _main(args::Vector{String})::Cint
                 state.github_token = token_response.access_token
                 state.github_refresh_token = token_response.refresh_token
                 save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
+                token_path = joinpath(state.claude_prefix, "github_tokens.json")
                 cprintln(GREEN, "✓ GitHub authenticated and token saved")
                 cprintln(YELLOW, "\n⚠️  Warning: Your GitHub token has been persisted to disk.")
+                println("   Token location: $(token_path)")
                 println("   It will be automatically used in future sessions.")
                 println("   Use --reset-all to remove the stored token.")
                 println()
