@@ -93,19 +93,6 @@ When you run the app, you'll enter a sandboxed environment where:
 - NPM is available at `/opt/nodejs/bin/npm`
 - claude-code is available at `/opt/npm/bin/claude` (after installation)
 
-## System-wide Installation
-
-To install the app system-wide:
-
-```bash
-sudo cp bin/claudebox /usr/local/bin/
-```
-
-Or create a symlink:
-```bash
-sudo ln -s $(pwd)/bin/claudebox /usr/local/bin/claudebox
-```
-
 ## How It Works
 
 1. Uses Sandbox.jl to create isolated Linux namespace containers

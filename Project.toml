@@ -14,6 +14,7 @@ NodeJS_22_jll = "8fca9ca2-e7a1-5ccf-8c05-43be5a78664f"
 Sandbox = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
 Scratch = "6c6a2e73-6563-6170-7368-637461726353"
 gh_cli_jll = "5d31d589-30fb-542f-b82d-10325e863e38"
+juliaup_jll = "038fdbe3-3777-5af9-9568-3738956aeb97"
 
 [sources]
 Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}

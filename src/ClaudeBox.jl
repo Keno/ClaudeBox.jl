@@ -7,6 +7,7 @@ using NodeJS_22_jll
 using gh_cli_jll
 using Git_jll
 using MozillaCACerts_jll
+using juliaup_jll
 
 include("github_auth.jl")
 using .GitHubAuth
@@ -38,6 +39,8 @@ mutable struct AppState
     npm_dir::String
     gh_cli_dir::String
     git_dir::String
+    juliaup_dir::String
+    julia_dir::String
     claude_home_dir::String
     work_dir::String
     claude_installed::Bool
@@ -104,14 +107,14 @@ function _main(args::Vector{String})::Cint
                 state.github_token = ""  # Clear invalid token
             end
         end
-        
+
         # Authenticate if we don't have a valid token
         if isempty(state.github_token)
             println("\n$(BOLD)GitHub Authentication$(RESET)")
             println("GitHub authentication enables git operations with your repositories.")
             println("To skip, use --no-github-auth")
             println()
-            
+
             token = GitHubAuth.authenticate()
             if GitHubAuth.validate_token(token)
                 state.github_token = token
@@ -239,6 +242,7 @@ function print_help()
         NPM is available at: /opt/nodejs/bin/npm
         Git is available at: /opt/git/bin/git
         GitHub CLI is available at: /opt/gh_cli/bin/gh
+        juliaup is available at: /opt/juliaup/bin/juliaup
         Claude-code is automatically installed on first run
     """)
 end
@@ -246,12 +250,19 @@ end
 function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false)::AppState
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
-    
+
     nodejs_dir = joinpath(tools_prefix, "nodejs")
     npm_dir = joinpath(tools_prefix, "npm")
     gh_cli_dir = joinpath(tools_prefix, "gh_cli")
     git_dir = joinpath(tools_prefix, "git")
+    juliaup_dir = joinpath(tools_prefix, "juliaup")
+    julia_dir = joinpath(tools_prefix, "julia")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
+
+    # Ensure directories exist, otherwise the mount will fail
+    for dir in (nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir)
+        mkpath(dir)
+    end
 
     # Check if claude is installed
     claude_bin = joinpath(npm_dir, "bin", "claude")
@@ -260,7 +271,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub token if available
     github_token = load_github_token(claude_prefix)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, claude_home_dir, work_dir, claude_installed, github_token, claude_args, keep_bash)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, github_token, claude_args, keep_bash)
 end
 
 
@@ -318,7 +329,7 @@ function setup_environment!(state::AppState)
         # Get user info from GitHub if we have a token
         user_name = "Sandbox User"
         user_email = "sandbox@localhost"
-        
+
         if !isempty(state.github_token)
             user_info = GitHubAuth.get_user_info(state.github_token)
             if !isnothing(user_info.name) && !isempty(user_info.name)
@@ -326,14 +337,14 @@ function setup_environment!(state::AppState)
             elseif !isnothing(user_info.login) && !isempty(user_info.login)
                 user_name = user_info.login
             end
-            
+
             if !isnothing(user_info.email) && !isempty(user_info.email)
                 user_email = user_info.email
             elseif !isnothing(user_info.login) && !isempty(user_info.login)
                 user_email = "$(user_info.login)@users.noreply.github.com"
             end
         end
-        
+
         write(gitconfig_path, """
 [http]
     sslCAInfo = /etc/ssl/certs/ca-certificates.crt
@@ -371,6 +382,15 @@ function setup_environment!(state::AppState)
         artifact_paths = collect_artifact_paths(["Git_jll"])
         deploy_artifact_paths(state.git_dir, artifact_paths)
         cprintln(GREEN, "  ✓ Git installed")
+    end
+
+    # Check if juliaup is installed
+    juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
+    if !isfile(juliaup_bin)
+        cprintln(YELLOW, "  Installing juliaup...")
+        artifact_paths = collect_artifact_paths(["juliaup_jll"])
+        deploy_artifact_paths(state.juliaup_dir, artifact_paths)
+        cprintln(GREEN, "  ✓ juliaup installed")
     end
 
     # Check if claude is installed
@@ -426,10 +446,12 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/opt/npm" => Sandbox.MountInfo(state.npm_dir, Sandbox.MountType.ReadWrite),
         "/opt/gh_cli" => Sandbox.MountInfo(state.gh_cli_dir, Sandbox.MountType.ReadOnly),
         "/opt/git" => Sandbox.MountInfo(state.git_dir, Sandbox.MountType.ReadOnly),
+        "/opt/juliaup" => Sandbox.MountInfo(state.juliaup_dir, Sandbox.MountType.ReadOnly),
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
-        "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite)
+        "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite),
+        "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite)
     )
 
     # Add resolv.conf for DNS resolution if it exists
@@ -451,12 +473,12 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         mkpath(ssl_certs_dir)
         cacert_copy = joinpath(ssl_certs_dir, "ca-certificates.crt")
         cp(cacert_file, cacert_copy; force=true)
-        
+
         # Also create a ca-bundle.crt symlink (some tools look for this)
         ca_bundle_link = joinpath(ssl_certs_dir, "ca-bundle.crt")
         rm(ca_bundle_link; force=true)
         symlink("ca-certificates.crt", ca_bundle_link)
-        
+
         # Mount the directory
         mounts["/etc/ssl/certs"] = Sandbox.MountInfo(ssl_certs_dir, Sandbox.MountType.ReadOnly)
     end
@@ -466,7 +488,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         mounts,
         # Environment
         Dict(
-            "PATH" => "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/usr/bin:/bin",
+            # Note: PATH is set in bashrc instead - passing it here gets overwritten by the sandbox
             "HOME" => "/root",
             "NODE_PATH" => "/opt/npm/lib/node_modules",
             "npm_config_prefix" => "/opt/npm",
@@ -480,6 +502,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
             "SSL_CERT_FILE" => "/etc/ssl/certs/ca-certificates.crt",
             "SSL_CERT_DIR" => "/etc/ssl/certs",
             "GIT_SSL_CAINFO" => "/etc/ssl/certs/ca-certificates.crt",
+            "JULIA_DEPOT_PATH" => "/root/.julia",
             "GIT_SSL_CAPATH" => "/etc/ssl/certs",
             "CURL_CA_BUNDLE" => "/etc/ssl/certs/ca-certificates.crt"
         ); stdin
@@ -559,18 +582,18 @@ $(isempty(state.github_token) ? "- No GitHub authentication configured" : "- Git
 - Git commits will use the configured user name and email
 - The sandbox provides a consistent, clean environment
 """
-        
+
         run(exe, config, `/bin/sh -c "cat > /CLAUDE.md << 'EOF'
 $claude_md_content
 EOF"`)
-        
+
         # Create a nice prompt and ensure PATH is set for bash
         if cmd.exec[1] == "/bin/bash"
             # Base bashrc content
             bashrc_content = """
 # Claude Sandbox environment
 export PS1="\\[\\033[32m\\][sandbox]\\[\\033[0m\\] \\w \\\$ "
-export PATH="/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/usr/bin:/bin:/usr/local/bin"
+export PATH="/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
 
 # Helpful aliases
 alias ll='ls -la'
@@ -585,7 +608,7 @@ alias l='ls -CF'
                 if !isnothing(state.claude_args) && !isempty(state.claude_args)
                     claude_args_str = " " * join(["\$(printf '%q' '$arg')" for arg in state.claude_args], " ")
                 end
-                
+
                 if state.keep_bash
                     bashrc_content *= """
 
