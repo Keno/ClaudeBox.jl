@@ -48,65 +48,48 @@ end
 
 function poll_for_token(device_code::String, interval::Int)
     while true
-        try
-            response = HTTP.post(
-                ACCESS_TOKEN_URL,
-                ["Accept" => "application/json"],
-                "client_id=$(CLIENT_ID)&device_code=$(device_code)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
+        response = HTTP.post(
+            ACCESS_TOKEN_URL,
+            ["Accept" => "application/json"],
+            "client_id=$(CLIENT_ID)&device_code=$(device_code)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
+        )
+        
+        data = JSON.parse(String(response.body))
+        
+        if haskey(data, "access_token")
+            return AccessTokenResponse(
+                data["access_token"],
+                data["token_type"],
+                data["scope"],
+                get(data, "refresh_token", nothing),
+                get(data, "expires_in", nothing),
+                get(data, "refresh_token_expires_in", nothing)
             )
-            
-            data = JSON.parse(String(response.body))
-            
-            if haskey(data, "access_token")
-                return AccessTokenResponse(
-                    data["access_token"],
-                    data["token_type"],
-                    data["scope"],
-                    get(data, "refresh_token", nothing),
-                    get(data, "expires_in", nothing),
-                    get(data, "refresh_token_expires_in", nothing)
-                )
-            elseif haskey(data, "error")
-                if data["error"] == "authorization_pending"
-                    sleep(interval)
-                    continue
-                elseif data["error"] == "slow_down"
-                    sleep(interval + 5)
-                    continue
-                else
-                    error("Authentication failed: $(data["error"])")
-                end
-            end
-        catch e
-            if isa(e, InterruptException)
-                println("\nAuthentication interrupted.")
-                rethrow(e)
+        elseif haskey(data, "error")
+            if data["error"] == "authorization_pending"
+                sleep(interval)
+                continue
+            elseif data["error"] == "slow_down"
+                sleep(interval + 5)
+                continue
             else
-                rethrow(e)
+                error("Authentication failed: $(data["error"])")
             end
         end
     end
 end
 
 function authenticate()
-    try
-        device_response = request_device_code()
-        
-        println("\nPlease visit: $(device_response.verification_uri)")
-        println("And enter code: $(device_response.user_code)")
-        println("\nWaiting for authorization (press Ctrl+C to skip)...")
-        
-        token_response = poll_for_token(device_response.device_code, device_response.interval)
-        
-        println("\nAuthentication successful!")
-        return token_response
-    catch e
-        if isa(e, InterruptException)
-            rethrow(e)
-        else
-            rethrow(e)
-        end
-    end
+    device_response = request_device_code()
+    
+    println("\nPlease visit: $(device_response.verification_uri)")
+    println("And enter code: $(device_response.user_code)")
+    println("\nWaiting for authorization (press Ctrl+C to skip)...")
+    
+    token_response = poll_for_token(device_response.device_code, device_response.interval)
+    
+    println("\nAuthentication successful!")
+    return token_response
 end
 
 function validate_token(token::String; silent::Bool=false)
