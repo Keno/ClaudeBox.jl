@@ -140,21 +140,30 @@ function _main(args::Vector{String})::Cint
             println("To skip authentication, use --no-github-auth")
             println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-            token_response = GitHubAuth.authenticate()
-            if GitHubAuth.validate_token(token_response.access_token)
-                state.github_token = token_response.access_token
-                state.github_refresh_token = token_response.refresh_token
-                save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
-                token_path = joinpath(state.claude_prefix, "github_tokens.json")
-                cprintln(GREEN, "✓ GitHub authenticated and token saved")
-                cprintln(YELLOW, "\n⚠️  Warning: Your GitHub token has been persisted to disk.")
-                println("   Token location: $(token_path)")
-                println("   It will be automatically used in future sessions.")
-                println("   Use --reset-all to remove the stored token.")
-                println()
-            else
-                cprintln(RED, "Failed to authenticate with GitHub")
-                return 1
+            try
+                token_response = GitHubAuth.authenticate()
+                if GitHubAuth.validate_token(token_response.access_token)
+                    state.github_token = token_response.access_token
+                    state.github_refresh_token = token_response.refresh_token
+                    save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
+                    token_path = joinpath(state.claude_prefix, "github_tokens.json")
+                    cprintln(GREEN, "✓ GitHub authenticated and token saved")
+                    cprintln(YELLOW, "\n⚠️  Warning: Your GitHub token has been persisted to disk.")
+                    println("   Token location: $(token_path)")
+                    println("   It will be automatically used in future sessions.")
+                    println("   Use --reset-all to remove the stored token.")
+                    println()
+                else
+                    cprintln(RED, "Failed to authenticate with GitHub")
+                    return 1
+                end
+            catch e
+                if isa(e, InterruptException)
+                    cprintln(YELLOW, "\nGitHub authentication skipped. Proceeding without GitHub access.")
+                    println()
+                else
+                    rethrow(e)
+                end
             end
         end
     end
