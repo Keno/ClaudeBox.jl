@@ -322,7 +322,6 @@ function save_github_tokens(claude_prefix::String, access_token::String, refresh
 end
 
 function load_github_tokens(claude_prefix::String)
-    # First check new format
     token_file = joinpath(claude_prefix, "github_tokens.json")
     if isfile(token_file)
         try
@@ -332,18 +331,9 @@ function load_github_tokens(claude_prefix::String)
                 refresh_token = get(tokens, "refresh_token", nothing)
             )
         catch
-            # Fall through to legacy format
+            # Invalid JSON file
+            return (access_token = "", refresh_token = nothing)
         end
-    end
-    
-    # Check legacy format for backward compatibility
-    legacy_file = joinpath(claude_prefix, "github_token")
-    if isfile(legacy_file)
-        token = strip(read(legacy_file, String))
-        # Migrate to new format
-        save_github_tokens(claude_prefix, token, nothing)
-        rm(legacy_file)  # Remove old file
-        return (access_token = token, refresh_token = nothing)
     end
     
     return (access_token = "", refresh_token = nothing)
