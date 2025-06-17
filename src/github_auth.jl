@@ -165,4 +165,39 @@ function refresh_access_token(refresh_token::String)
     return nothing
 end
 
+function check_claude_sandbox_repo(token::String)
+    try
+        # Get authenticated user info
+        user_response = HTTP.get(
+            "https://api.github.com/user",
+            ["Authorization" => "Bearer $token", "Accept" => "application/vnd.github.v3+json"]
+        )
+        
+        if user_response.status != 200
+            return nothing
+        end
+        
+        user_data = JSON.parse(String(user_response.body))
+        username = user_data["login"]
+        
+        # Check if .claude_sandbox repo exists
+        repo_response = HTTP.get(
+            "https://api.github.com/repos/$username/.claude_sandbox",
+            ["Authorization" => "Bearer $token", "Accept" => "application/vnd.github.v3+json"]
+        )
+        
+        if repo_response.status == 200
+            repo_data = JSON.parse(String(repo_response.body))
+            return (
+                clone_url = repo_data["clone_url"],
+                ssh_url = repo_data["ssh_url"],
+                username = username
+            )
+        end
+    catch e
+        # Repository doesn't exist or other error
+    end
+    return nothing
+end
+
 end # module

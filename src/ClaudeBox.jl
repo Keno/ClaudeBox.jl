@@ -202,9 +202,15 @@ function _main(args::Vector{String})::Cint
 
     # Setup environment
     setup_environment!(state)
+    
+    # Handle .claude_sandbox repository if authenticated
+    claude_sandbox_path = nothing
+    if !isempty(state.github_token)
+        claude_sandbox_path = handle_claude_sandbox_repo(state)
+    end
 
     # Create and run sandbox
-    run_sandbox(state)
+    run_sandbox(state, claude_sandbox_path)
 
     cprintln(GREEN, "\nGoodbye!")
     return 0
@@ -359,6 +365,60 @@ function reset_all()
     clear_scratchspaces!(@__MODULE__)
     cprintln(GREEN, "✓ Full reset complete")
     println()
+end
+
+function handle_claude_sandbox_repo(state::AppState)
+    cprintln(BLUE, "Checking for .claude_sandbox repository...")
+    
+    repo_info = GitHubAuth.check_claude_sandbox_repo(state.github_token)
+    if isnothing(repo_info)
+        return nothing
+    end
+    
+    cprintln(GREEN, "✓ Found .claude_sandbox repository for $(repo_info.username)")
+    
+    # Create directory for the repo
+    sandbox_repo_dir = joinpath(state.claude_prefix, "claude_sandbox_repo")
+    
+    # Clone or update the repository
+    if isdir(joinpath(sandbox_repo_dir, ".git"))
+        # Repository exists, update it
+        cprintln(YELLOW, "  Updating .claude_sandbox repository...")
+        try
+            # Set the token for authentication
+            run(`git -C $sandbox_repo_dir config credential.helper store`)
+            
+            # Create credentials file temporarily
+            creds_file = joinpath(state.claude_prefix, "git-credentials")
+            write(creds_file, "https://$(repo_info.username):$(state.github_token)@github.com\n")
+            
+            withenv("HOME" => state.claude_prefix) do
+                run(`git -C $sandbox_repo_dir pull --quiet`)
+            end
+            
+            rm(creds_file; force=true)
+            cprintln(GREEN, "  ✓ Repository updated")
+        catch e
+            cprintln(YELLOW, "  ⚠ Failed to update repository: $e")
+        end
+    else
+        # Clone the repository
+        cprintln(YELLOW, "  Cloning .claude_sandbox repository...")
+        try
+            mkpath(dirname(sandbox_repo_dir))
+            
+            # Clone using token authentication
+            clone_url = replace(repo_info.clone_url, "https://github.com/" => "https://$(state.github_token)@github.com/")
+            run(`git clone --quiet $clone_url $sandbox_repo_dir`)
+            
+            cprintln(GREEN, "  ✓ Repository cloned")
+        catch e
+            cprintln(RED, "  ✗ Failed to clone repository: $e")
+            return nothing
+        end
+    end
+    
+    return sandbox_repo_dir
 end
 
 function save_github_tokens(claude_prefix::String, access_token::String, refresh_token::Union{String, Nothing}=nothing)
@@ -523,7 +583,7 @@ end
 
 const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
 
-function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.SandboxConfig
+function create_sandbox_config(state::AppState; stdin=Base.devnull, claude_sandbox_path=nothing)::Sandbox.SandboxConfig
     # Prepare mounts using MountInfo
     mounts = Dict{String, Sandbox.MountInfo}(
         "/" => Sandbox.MountInfo(Sandbox.debian_rootfs(), Sandbox.MountType.Overlayed),
@@ -538,6 +598,11 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite),
         "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite)
     )
+    
+    # Add claude_sandbox repository if available
+    if !isnothing(claude_sandbox_path) && isdir(claude_sandbox_path)
+        mounts["/root/.claude_sandbox"] = Sandbox.MountInfo(claude_sandbox_path, Sandbox.MountType.ReadWrite)
+    end
 
     # Add resolv.conf for DNS resolution if it exists
     if isfile("/etc/resolv.conf")
@@ -595,8 +660,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
     )
 end
 
-function run_sandbox(state::AppState)
-    config = create_sandbox_config(state)
+function run_sandbox(state::AppState, claude_sandbox_path=nothing)
+    config = create_sandbox_config(state; claude_sandbox_path)
 
     # Print session info
     cprintln(CYAN, "════════════════════════════════════════")
@@ -631,11 +696,24 @@ function run_sandbox(state::AppState)
 
     println()
 
-    interactive_config = create_sandbox_config(state; stdin=Base.stdin)
+    interactive_config = create_sandbox_config(state; stdin=Base.stdin, claude_sandbox_path)
 
     # Run the sandbox
     Sandbox.with_executor() do exe
         # Create CLAUDE.md in the sandbox root
+        claude_sandbox_section = ""
+        if !isnothing(claude_sandbox_path) && isdir(claude_sandbox_path)
+            claude_sandbox_section = """
+
+## User Configuration
+
+Your personal .claude_sandbox repository is mounted at `/root/.claude_sandbox`.
+
+If you have a `CLAUDE_SANDBOX.md` file in that directory, it contains user-specific instructions and preferences.
+Please check `/root/.claude_sandbox/CLAUDE_SANDBOX.md` for any custom configurations or instructions.
+"""
+        end
+        
         claude_md_content = """
 # ClaudeBox Sandbox Environment
 
@@ -660,7 +738,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
 
 ## GitHub Integration
 
-$(isempty(state.github_token) ? "- No GitHub authentication configured" : "- GitHub authenticated - you can use git and gh commands")
+$(isempty(state.github_token) ? "- No GitHub authentication configured" : "- GitHub authenticated - you can use git and gh commands")$claude_sandbox_section
 
 ## Tips
 
