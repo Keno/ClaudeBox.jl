@@ -10,7 +10,7 @@ using MozillaCACerts_jll
 using juliaup_jll
 using JSON
 using HTTP
-using REPL.Terminals: raw!
+using REPL.Terminals: raw!, TTYTerminal
 
 include("github_auth.jl")
 using .GitHubAuth
@@ -60,7 +60,8 @@ Main entry point for the ClaudeBox application.
 """
 function monitor_stdin_for_interrupt(auth_task::Task)
     @async begin
-        raw_mode = raw!(stdin, true)
+        term = TTYTerminal("", stdin, stdout, stderr)
+        raw_mode = raw!(term, true)
         try
             while !istaskdone(auth_task)
                 if bytesavailable(stdin) > 0
@@ -76,7 +77,7 @@ function monitor_stdin_for_interrupt(auth_task::Task)
             # Monitor task ended
         finally
             # Restore terminal settings
-            raw!(stdin, raw_mode)
+            raw!(term, raw_mode)
         end
     end
 end
