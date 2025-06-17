@@ -64,14 +64,11 @@ function monitor_stdin_for_interrupt(auth_task::Task)
         raw_mode = raw!(term, true)
         try
             while !istaskdone(auth_task)
-                if bytesavailable(stdin) > 0
-                    b = read(stdin, 1)
-                    if b[1] == 0x03  # Ctrl+C
-                        schedule(auth_task, InterruptException(), error=true)
-                        break
-                    end
+                b = read(stdin, 1)
+                if b[1] == 0x03  # Ctrl+C
+                    schedule(auth_task, InterruptException(), error=true)
+                    break
                 end
-                sleep(0.1)
             end
         catch
             # Monitor task ended
