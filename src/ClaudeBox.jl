@@ -10,6 +10,7 @@ using MozillaCACerts_jll
 using juliaup_jll
 using JSON
 using HTTP
+using REPL.Terminals: raw!
 
 include("github_auth.jl")
 using .GitHubAuth
