@@ -59,7 +59,21 @@ Main entry point for the ClaudeBox application.
 """
 function monitor_stdin_for_interrupt(auth_task::Task)
     @async begin
+        # Save current terminal settings
+        old_termios = zeros(UInt8, 60)  # termios struct size
+        ccall(:tcgetattr, Cint, (Cint, Ptr{UInt8}), 0, old_termios)
+        
+        # Put terminal in raw mode
+        raw_termios = copy(old_termios)
+        # c_lflag &= ~(ICANON | ECHO)
+        lflag_offset = 12  # c_lflag offset in termios struct
+        lflag = reinterpret(UInt32, raw_termios[lflag_offset+1:lflag_offset+4])[1]
+        lflag &= ~UInt32(0x0002 | 0x0008)  # ~(ICANON | ECHO)
+        raw_termios[lflag_offset+1:lflag_offset+4] = reinterpret(UInt8, [lflag])
+        
         try
+            ccall(:tcsetattr, Cint, (Cint, Cint, Ptr{UInt8}), 0, 0, raw_termios)
+            
             while !istaskdone(auth_task)
                 if bytesavailable(stdin) > 0
                     b = read(stdin, 1)
@@ -72,6 +86,9 @@ function monitor_stdin_for_interrupt(auth_task::Task)
             end
         catch
             # Monitor task ended
+        finally
+            # Restore terminal settings
+            ccall(:tcsetattr, Cint, (Cint, Cint, Ptr{UInt8}), 0, 0, old_termios)
         end
     end
 end
@@ -189,7 +206,7 @@ function _main(args::Vector{String})::Cint
                     rethrow(e)
                 end
             end
-            
+
             # Start monitor and run authentication
             monitor_stdin_for_interrupt(auth_task)
             schedule(auth_task)
@@ -343,7 +360,7 @@ end
 
 function reset_tools()
     cprintln(YELLOW, "Resetting tools (keeping Claude settings)...")
-    scratch_path = scratch_dir(TOOLS_SCRATCH_KEY)
+    scratch_path = @get_scratch!(TOOLS_SCRATCH_KEY)
     if isdir(scratch_path)
         rm(scratch_path; recursive=true, force=true)
     end
@@ -518,6 +535,8 @@ function setup_environment!(state::AppState)
     println()
 end
 
+const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
+
 function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.SandboxConfig
     # Prepare mounts using MountInfo
     mounts = Dict{String, Sandbox.MountInfo}(
@@ -568,8 +587,9 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         mounts,
         # Environment
         Dict(
-            # Note: PATH is set in bashrc instead - passing it here gets overwritten by the sandbox
             "HOME" => "/root",
+            # Note: We need to set PATH both here and in bashrc, because bash overrides it on login
+            "PATH" => SANDBOX_PATH,
             "NODE_PATH" => "/opt/npm/lib/node_modules",
             "npm_config_prefix" => "/opt/npm",
             "npm_config_cache" => "/opt/npm/cache",
@@ -673,7 +693,7 @@ EOF"`)
             bashrc_content = """
 # Claude Sandbox environment
 export PS1="\\[\\033[32m\\][sandbox]\\[\\033[0m\\] \\w \\\$ "
-export PATH="/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
+export PATH="$SANDBOX_PATH"
 
 # Helpful aliases
 alias ll='ls -la'
