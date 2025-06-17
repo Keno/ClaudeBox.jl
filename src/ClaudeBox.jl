@@ -57,21 +57,21 @@ end
 
 Main entry point for the ClaudeBox application.
 """
-function monitor_stdin_for_interrupt(interrupt_channel::Channel{Bool})
+function monitor_stdin_for_interrupt(auth_task::Task)
     @async begin
         try
-            while true
+            while !istaskdone(auth_task)
                 if bytesavailable(stdin) > 0
                     b = read(stdin, 1)
                     if b[1] == 0x03  # Ctrl+C
-                        put!(interrupt_channel, true)
+                        schedule(auth_task, InterruptException(), error=true)
                         break
                     end
                 end
                 sleep(0.1)
             end
         catch
-            # Task ended
+            # Monitor task ended
         end
     end
 end
@@ -160,12 +160,9 @@ function _main(args::Vector{String})::Cint
             println("To skip authentication, use --no-github-auth")
             println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-            # Create interrupt channel and start monitor
-            interrupt_channel = Channel{Bool}(1)
-            monitor_stdin_for_interrupt(interrupt_channel)
-            
-            try
-                token_response = GitHubAuth.authenticate(; interrupt_channel)
+            # Run authentication in a task so we can interrupt it
+            auth_task = @task try
+                token_response = GitHubAuth.authenticate()
                 if GitHubAuth.validate_token(token_response.access_token)
                     state.github_token = token_response.access_token
                     state.github_refresh_token = token_response.refresh_token
@@ -182,11 +179,8 @@ function _main(args::Vector{String})::Cint
                     return 1
                 end
             catch e
-                if isa(e, GitHubAuth.AuthInterruptedException)
+                if isa(e, InterruptException)
                     cprintln(YELLOW, "\nGitHub authentication interrupted. Proceeding without GitHub access.")
-                    println()
-                elseif isa(e, InterruptException)
-                    cprintln(YELLOW, "\nGitHub authentication skipped. Proceeding without GitHub access.")
                     println()
                 elseif isa(e, HTTP.RequestError) && isa(e.error, InterruptException)
                     cprintln(YELLOW, "\nGitHub authentication interrupted. Proceeding without GitHub access.")
@@ -194,9 +188,12 @@ function _main(args::Vector{String})::Cint
                 else
                     rethrow(e)
                 end
-            finally
-                close(interrupt_channel)
             end
+            
+            # Start monitor and run authentication
+            monitor_stdin_for_interrupt(auth_task)
+            schedule(auth_task)
+            wait(auth_task)
         end
     end
 
