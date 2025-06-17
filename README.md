@@ -60,6 +60,12 @@ Run claude-code with your current directory mounted:
 ./bin/claudebox -w ~/my-project
 ```
 
+### Skip GitHub Authentication
+
+```bash
+./bin/claudebox --no-github-auth
+```
+
 ### Reset Environment
 
 Clear all cached data and reinstall:
@@ -92,6 +98,29 @@ When you run the app, you'll enter a sandboxed environment where:
 - Node.js is available at `/opt/nodejs/bin/node`
 - NPM is available at `/opt/nodejs/bin/npm`
 - claude-code is available at `/opt/npm/bin/claude` (after installation)
+
+## GitHub Integration
+
+ClaudeBox includes built-in GitHub authentication using OAuth device flow. When authenticated:
+
+- Git operations work seamlessly with your repositories
+- GitHub CLI (`gh`) is available for advanced operations
+- Your git commits are configured with your GitHub username and email
+
+### Personal Claude Sandbox Repository
+
+If you have a repository named `.claude_sandbox` in your GitHub account, ClaudeBox will automatically:
+
+1. Clone or update the repository on each launch
+2. Mount it at `/root/.claude_sandbox` in the sandbox
+3. Reference any `CLAUDE_SANDBOX.md` file in the default Claude instructions
+
+This allows you to maintain personal configurations, custom instructions, or project templates that Claude will have access to in every session.
+
+To use this feature:
+1. Create a repository named `.claude_sandbox` in your GitHub account
+2. Add a `CLAUDE_SANDBOX.md` file with your custom instructions
+3. ClaudeBox will automatically detect and use it
 
 ## How It Works
 
