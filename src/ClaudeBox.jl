@@ -51,6 +51,7 @@ mutable struct AppState
     github_refresh_token::Union{String, Nothing}
     claude_args::Vector{String}
     keep_bash::Bool
+    claude_sandbox_dir::Union{String, Nothing}
 end
 
 """
@@ -204,13 +205,12 @@ function _main(args::Vector{String})::Cint
     setup_environment!(state)
     
     # Handle .claude_sandbox repository if authenticated
-    claude_sandbox_path = nothing
     if !isempty(state.github_token)
-        claude_sandbox_path = handle_claude_sandbox_repo(state)
+        handle_claude_sandbox_repo!(state)
     end
 
     # Create and run sandbox
-    run_sandbox(state, claude_sandbox_path)
+    run_sandbox(state)
 
     cprintln(GREEN, "\nGoodbye!")
     return 0
@@ -346,7 +346,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing)
 end
 
 
@@ -367,12 +367,13 @@ function reset_all()
     println()
 end
 
-function handle_claude_sandbox_repo(state::AppState)
+function handle_claude_sandbox_repo!(state::AppState)
     cprintln(BLUE, "Checking for .claude_sandbox repository...")
     
     repo_info = GitHubAuth.check_claude_sandbox_repo(state.github_token)
     if isnothing(repo_info)
-        return nothing
+        state.claude_sandbox_dir = nothing
+        return
     end
     
     cprintln(GREEN, "✓ Found .claude_sandbox repository for $(repo_info.username)")
@@ -414,11 +415,12 @@ function handle_claude_sandbox_repo(state::AppState)
             cprintln(GREEN, "  ✓ Repository cloned")
         catch e
             cprintln(RED, "  ✗ Failed to clone repository: $e")
-            return nothing
+            state.claude_sandbox_dir = nothing
+            return
         end
     end
     
-    return sandbox_repo_dir
+    state.claude_sandbox_dir = sandbox_repo_dir
 end
 
 function save_github_tokens(claude_prefix::String, access_token::String, refresh_token::Union{String, Nothing}=nothing)
@@ -583,7 +585,7 @@ end
 
 const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
 
-function create_sandbox_config(state::AppState; stdin=Base.devnull, claude_sandbox_path=nothing)::Sandbox.SandboxConfig
+function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.SandboxConfig
     # Prepare mounts using MountInfo
     mounts = Dict{String, Sandbox.MountInfo}(
         "/" => Sandbox.MountInfo(Sandbox.debian_rootfs(), Sandbox.MountType.Overlayed),
@@ -600,8 +602,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, claude_sandb
     )
     
     # Add claude_sandbox repository if available
-    if !isnothing(claude_sandbox_path) && isdir(claude_sandbox_path)
-        mounts["/root/.claude_sandbox"] = Sandbox.MountInfo(claude_sandbox_path, Sandbox.MountType.ReadWrite)
+    if !isnothing(state.claude_sandbox_dir) && isdir(state.claude_sandbox_dir)
+        mounts["/root/.claude_sandbox"] = Sandbox.MountInfo(state.claude_sandbox_dir, Sandbox.MountType.ReadWrite)
     end
 
     # Add resolv.conf for DNS resolution if it exists
@@ -660,8 +662,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, claude_sandb
     )
 end
 
-function run_sandbox(state::AppState, claude_sandbox_path=nothing)
-    config = create_sandbox_config(state; claude_sandbox_path)
+function run_sandbox(state::AppState)
+    config = create_sandbox_config(state)
 
     # Print session info
     cprintln(CYAN, "════════════════════════════════════════")
@@ -696,13 +698,13 @@ function run_sandbox(state::AppState, claude_sandbox_path=nothing)
 
     println()
 
-    interactive_config = create_sandbox_config(state; stdin=Base.stdin, claude_sandbox_path)
+    interactive_config = create_sandbox_config(state; stdin=Base.stdin)
 
     # Run the sandbox
     Sandbox.with_executor() do exe
         # Create CLAUDE.md in the sandbox root
         claude_sandbox_section = ""
-        if !isnothing(claude_sandbox_path) && isdir(claude_sandbox_path)
+        if !isnothing(state.claude_sandbox_dir) && isdir(state.claude_sandbox_dir)
             claude_sandbox_section = """
 
 ## User Configuration
