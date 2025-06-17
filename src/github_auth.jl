@@ -25,6 +25,9 @@ struct AccessTokenResponse
     refresh_token_expires_in::Union{Int, Nothing}
 end
 
+# Custom exception for authentication interruption
+struct AuthInterruptedException <: Exception end
+
 function request_device_code()
     response = HTTP.post(
         DEVICE_CODE_URL,
@@ -46,8 +49,14 @@ function request_device_code()
     )
 end
 
-function poll_for_token(device_code::String, interval::Int)
+function poll_for_token(device_code::String, interval::Int; interrupt_channel::Channel{Bool})
     while true
+        # Check if we should interrupt
+        if isready(interrupt_channel)
+            take!(interrupt_channel)
+            throw(AuthInterruptedException())
+        end
+        
         response = HTTP.post(
             ACCESS_TOKEN_URL,
             ["Accept" => "application/json"],
@@ -67,10 +76,24 @@ function poll_for_token(device_code::String, interval::Int)
             )
         elseif haskey(data, "error")
             if data["error"] == "authorization_pending"
-                sleep(interval)
+                # Sleep in small intervals to check for interruption
+                for i in 1:interval
+                    if isready(interrupt_channel)
+                        take!(interrupt_channel)
+                        throw(AuthInterruptedException())
+                    end
+                    sleep(1)
+                end
                 continue
             elseif data["error"] == "slow_down"
-                sleep(interval + 5)
+                # Sleep in small intervals to check for interruption
+                for i in 1:(interval + 5)
+                    if isready(interrupt_channel)
+                        take!(interrupt_channel)
+                        throw(AuthInterruptedException())
+                    end
+                    sleep(1)
+                end
                 continue
             else
                 error("Authentication failed: $(data["error"])")
@@ -79,14 +102,14 @@ function poll_for_token(device_code::String, interval::Int)
     end
 end
 
-function authenticate()
+function authenticate(; interrupt_channel::Channel{Bool})
     device_response = request_device_code()
     
     println("\nPlease visit: $(device_response.verification_uri)")
     println("And enter code: $(device_response.user_code)")
     println("\nWaiting for authorization (press Ctrl+C to skip)...")
     
-    token_response = poll_for_token(device_response.device_code, device_response.interval)
+    token_response = poll_for_token(device_response.device_code, device_response.interval; interrupt_channel)
     
     println("\nAuthentication successful!")
     return token_response
