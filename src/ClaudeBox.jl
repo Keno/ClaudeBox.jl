@@ -59,21 +59,8 @@ Main entry point for the ClaudeBox application.
 """
 function monitor_stdin_for_interrupt(auth_task::Task)
     @async begin
-        # Save current terminal settings
-        old_termios = zeros(UInt8, 60)  # termios struct size
-        ccall(:tcgetattr, Cint, (Cint, Ptr{UInt8}), 0, old_termios)
-        
-        # Put terminal in raw mode
-        raw_termios = copy(old_termios)
-        # c_lflag &= ~(ICANON | ECHO)
-        lflag_offset = 12  # c_lflag offset in termios struct
-        lflag = reinterpret(UInt32, raw_termios[lflag_offset+1:lflag_offset+4])[1]
-        lflag &= ~UInt32(0x0002 | 0x0008)  # ~(ICANON | ECHO)
-        raw_termios[lflag_offset+1:lflag_offset+4] = reinterpret(UInt8, [lflag])
-        
+        raw_mode = raw!(stdin, true)
         try
-            ccall(:tcsetattr, Cint, (Cint, Cint, Ptr{UInt8}), 0, 0, raw_termios)
-            
             while !istaskdone(auth_task)
                 if bytesavailable(stdin) > 0
                     b = read(stdin, 1)
@@ -88,7 +75,7 @@ function monitor_stdin_for_interrupt(auth_task::Task)
             # Monitor task ended
         finally
             # Restore terminal settings
-            ccall(:tcsetattr, Cint, (Cint, Cint, Ptr{UInt8}), 0, 0, old_termios)
+            raw!(stdin, raw_mode)
         end
     end
 end
