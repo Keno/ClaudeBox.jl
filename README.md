@@ -98,9 +98,8 @@ By default, GitHub authentication uses minimal permissions. For broader access i
 When you run the app, you'll enter a sandboxed environment where:
 
 - Your files are available at `/workspace`
-- Node.js is available at `/opt/nodejs/bin/node`
-- NPM is available at `/opt/nodejs/bin/npm`
-- claude-code is available at `/opt/npm/bin/claude` (after installation)
+- Various development tools are pre-installed and available
+- claude-code is automatically installed on first run
 
 ## Personal Claude Sandbox Repository
 

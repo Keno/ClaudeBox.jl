@@ -9,6 +9,8 @@ using Git_jll
 using GNUMake_jll
 using MozillaCACerts_jll
 using juliaup_jll
+using ripgrep_jll
+using Python_jll
 using JSON
 using HTTP
 using REPL.Terminals: raw!, TTYTerminal
@@ -332,6 +334,8 @@ function print_help()
         Git is available at: /opt/build_tools/bin/git
         GitHub CLI is available at: /opt/gh_cli/bin/gh
         GNU Make is available at: /opt/build_tools/bin/make
+        ripgrep is available at: /opt/build_tools/bin/rg
+        Python is available at: /opt/build_tools/bin/python3
         juliaup is available at: /opt/juliaup/bin/juliaup
         Claude-code is automatically installed on first run
     """)
@@ -489,6 +493,35 @@ function load_github_tokens(claude_prefix::String, dangerous_mode::Bool=false)
     return (access_token = "", refresh_token = nothing)
 end
 
+"""
+    install_jll_tool(tool_name::String, jll_name::String, bin_path::String, install_dir::String; post_install=nothing)
+
+Install a JLL tool if it's not already installed.
+
+# Arguments
+- `tool_name`: Display name of the tool
+- `jll_name`: Name of the JLL package
+- `bin_path`: Full path to the binary to check for existence
+- `install_dir`: Directory to install the tool into
+- `post_install`: Optional function to run after installation
+"""
+function install_jll_tool(tool_name::String, jll_name::String, bin_path::String, install_dir::String; post_install=nothing)
+    if !isfile(bin_path)
+        cprintln(YELLOW, "  Installing $tool_name...")
+        artifact_paths = collect_artifact_paths([jll_name])
+        deploy_artifact_paths(install_dir, artifact_paths)
+        
+        # Run post-install hook if provided
+        if !isnothing(post_install)
+            post_install()
+        end
+        
+        cprintln(GREEN, "  ✓ $tool_name installed")
+        return true
+    end
+    return false
+end
+
 function setup_environment!(state::AppState)
     cprint(BLUE, "Setting up environment...")
 
@@ -566,56 +599,41 @@ esac
 
     # Check if Node.js is installed
     node_bin = joinpath(state.nodejs_dir, "bin", "node")
-    if !isfile(node_bin)
-        println()
-        cprintln(YELLOW, "  Installing Node.js v22...")
-        artifact_paths = collect_artifact_paths(["NodeJS_22_jll"])
-        deploy_artifact_paths(state.nodejs_dir, artifact_paths)
-        cprintln(GREEN, "  ✓ Node.js installed")
-    else
+    if !install_jll_tool("Node.js v22", "NodeJS_22_jll", node_bin, state.nodejs_dir)
         cprintln(GREEN, " Done!")
     end
 
     # Check if gh CLI is installed
     gh_bin = joinpath(state.gh_cli_dir, "bin", "gh")
-    if !isfile(gh_bin)
-        cprintln(YELLOW, "  Installing GitHub CLI...")
-        artifact_paths = collect_artifact_paths(["gh_cli_jll"])
-        deploy_artifact_paths(state.gh_cli_dir, artifact_paths)
-        cprintln(GREEN, "  ✓ GitHub CLI installed")
-    end
+    install_jll_tool("GitHub CLI", "gh_cli_jll", gh_bin, state.gh_cli_dir)
 
     # Check if Git is installed
     git_bin = joinpath(state.build_tools_dir, "bin", "git")
-    if !isfile(git_bin)
-        cprintln(YELLOW, "  Installing Git...")
-        artifact_paths = collect_artifact_paths(["Git_jll"])
-        deploy_artifact_paths(state.build_tools_dir, artifact_paths)
-        cprintln(GREEN, "  ✓ Git installed")
-    end
+    install_jll_tool("Git", "Git_jll", git_bin, state.build_tools_dir)
 
     # Check if GNU Make is installed
     make_bin = joinpath(state.build_tools_dir, "bin", "make")
     gmake_bin = joinpath(state.build_tools_dir, "bin", "gmake")
     if !isfile(make_bin) && !isfile(gmake_bin)
-        cprintln(YELLOW, "  Installing GNU Make...")
-        artifact_paths = collect_artifact_paths(["GNUMake_jll"])
-        deploy_artifact_paths(state.build_tools_dir, artifact_paths)
-        # If gmake exists but make doesn't, create symlink
-        if isfile(gmake_bin) && !isfile(make_bin) && !islink(make_bin)
-            symlink("gmake", make_bin)
+        install_jll_tool("GNU Make", "GNUMake_jll", gmake_bin, state.build_tools_dir) do
+            # If gmake exists but make doesn't, create symlink
+            if isfile(gmake_bin) && !isfile(make_bin) && !islink(make_bin)
+                symlink("gmake", make_bin)
+            end
         end
-        cprintln(GREEN, "  ✓ GNU Make installed")
     end
 
     # Check if juliaup is installed
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
-    if !isfile(juliaup_bin)
-        cprintln(YELLOW, "  Installing juliaup...")
-        artifact_paths = collect_artifact_paths(["juliaup_jll"])
-        deploy_artifact_paths(state.juliaup_dir, artifact_paths)
-        cprintln(GREEN, "  ✓ juliaup installed")
-    end
+    install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
+
+    # Check if ripgrep is installed
+    rg_bin = joinpath(state.build_tools_dir, "bin", "rg")
+    install_jll_tool("ripgrep", "ripgrep_jll", rg_bin, state.build_tools_dir)
+
+    # Check if Python is installed
+    python_bin = joinpath(state.build_tools_dir, "bin", "python3")
+    install_jll_tool("Python", "Python_jll", python_bin, state.build_tools_dir)
 
     # Check if claude is installed
     claude_bin = joinpath(state.npm_dir, "bin", "claude")
@@ -770,6 +788,8 @@ function run_sandbox(state::AppState)
         println("   $(BOLD)git$(RESET)   - Git version control")
         println("   $(BOLD)gh$(RESET)    - GitHub CLI")
         println("   $(BOLD)make$(RESET)  - GNU Make build tool")
+        println("   $(BOLD)rg$(RESET)    - ripgrep (fast search)")
+        println("   $(BOLD)python3$(RESET) - Python interpreter")
         println("\n💡 To install claude-code:")
         println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
     end
@@ -810,6 +830,8 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
   - Git for version control
   - GitHub CLI (gh) for GitHub operations
   - GNU Make (make) for build automation
+  - ripgrep (rg) for fast text searching
+  - Python 3 for Python development
   - Standard Unix tools
 
 ## Important Notes
@@ -834,6 +856,12 @@ end)$claude_sandbox_section
 - Use the workspace directory for all file operations
 - Git commits will use the configured user name and email
 - The sandbox provides a consistent, clean environment
+
+## Development Notes
+
+- After adding new dependencies to Project.toml, always run `julia +nightly --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"` to resolve and install them
+- Always use Julia nightly (`+nightly`) when resolving dependencies to ensure compatibility
+- This ensures all JLL packages and dependencies are properly resolved and installed
 """
 
         run(exe, config, `/bin/sh -c "mkdir /etc/claude-code && cat > /etc/claude-code/CLAUDE.md << 'EOF'
