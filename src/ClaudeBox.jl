@@ -331,7 +331,7 @@ function print_help()
         NPM is available at: /opt/nodejs/bin/npm
         Git is available at: /opt/build_tools/bin/git
         GitHub CLI is available at: /opt/gh_cli/bin/gh
-        GNU Make is available at: /opt/build_tools/bin/gmake (also as 'make')
+        GNU Make is available at: /opt/build_tools/bin/make
         juliaup is available at: /opt/juliaup/bin/juliaup
         Claude-code is automatically installed on first run
     """)
@@ -595,15 +595,15 @@ esac
     end
 
     # Check if GNU Make is installed
-    make_bin = joinpath(state.build_tools_dir, "bin", "gmake")
-    if !isfile(make_bin)
+    make_bin = joinpath(state.build_tools_dir, "bin", "make")
+    gmake_bin = joinpath(state.build_tools_dir, "bin", "gmake")
+    if !isfile(make_bin) && !isfile(gmake_bin)
         cprintln(YELLOW, "  Installing GNU Make...")
         artifact_paths = collect_artifact_paths(["GNUMake_jll"])
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
-        # Create a symlink from 'make' to 'gmake' for convenience
-        make_link = joinpath(state.build_tools_dir, "bin", "make")
-        if !isfile(make_link) && !islink(make_link)
-            symlink("gmake", make_link)
+        # If gmake exists but make doesn't, create symlink
+        if isfile(gmake_bin) && !isfile(make_bin) && !islink(make_bin)
+            symlink("gmake", make_bin)
         end
         cprintln(GREEN, "  ✓ GNU Make installed")
     end
@@ -809,7 +809,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
   - Node.js and npm for JavaScript development
   - Git for version control
   - GitHub CLI (gh) for GitHub operations
-  - GNU Make (gmake/make) for build automation
+  - GNU Make (make) for build automation
   - Standard Unix tools
 
 ## Important Notes
