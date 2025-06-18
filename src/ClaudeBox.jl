@@ -6,6 +6,7 @@ using Scratch
 using NodeJS_22_jll
 using gh_cli_jll
 using Git_jll
+using GNUMake_jll
 using MozillaCACerts_jll
 using juliaup_jll
 using JSON
@@ -41,7 +42,7 @@ mutable struct AppState
     nodejs_dir::String
     npm_dir::String
     gh_cli_dir::String
-    git_dir::String
+    build_tools_dir::String
     juliaup_dir::String
     julia_dir::String
     claude_home_dir::String
@@ -52,6 +53,7 @@ mutable struct AppState
     claude_args::Vector{String}
     keep_bash::Bool
     claude_sandbox_dir::Union{String, Nothing}
+    dangerous_github_auth::Bool
 end
 
 """
@@ -120,7 +122,7 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
@@ -132,12 +134,13 @@ function _main(args::Vector{String})::Cint
                 # Try to refresh the token if we have a refresh token
                 if !isnothing(state.github_refresh_token) && !isempty(state.github_refresh_token)
                     cprintln(YELLOW, "Access token expired, attempting to refresh...")
-                    refresh_response = GitHubAuth.refresh_access_token(state.github_refresh_token)
+                    refresh_response = GitHubAuth.refresh_access_token(state.github_refresh_token; dangerous_mode=state.dangerous_github_auth)
                     if !isnothing(refresh_response)
                         state.github_token = refresh_response.access_token
                         state.github_refresh_token = refresh_response.refresh_token
-                        save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
-                        token_path = joinpath(state.claude_prefix, "github_tokens.json")
+                        save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token, state.dangerous_github_auth)
+                        filename = state.dangerous_github_auth ? "github_tokens_dangerous.json" : "github_tokens.json"
+                        token_path = joinpath(state.claude_prefix, filename)
                         cprintln(GREEN, "✓ GitHub token refreshed successfully")
                         cprintln(CYAN, "   Token location: $(token_path)")
                     else
@@ -157,21 +160,28 @@ function _main(args::Vector{String})::Cint
         if isempty(state.github_token)
             println("\n🔐 $(BOLD)GitHub Authentication$(RESET)")
             println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-            println("This will securely authorize access to your GitHub repositories")
-            println("without requiring a full personal access token. The app will only")
-            println("have access to repositories you explicitly grant permission to.")
+            if state.dangerous_github_auth
+                println("This will authorize DANGEROUS access to your GitHub account")
+                println("including repository creation and broader permissions.")
+                println("Use with caution!")
+            else
+                println("This will securely authorize access to your GitHub repositories")
+                println("without requiring a full personal access token. The app will only")
+                println("have access to repositories you explicitly grant permission to.")
+            end
             println()
             println("To skip authentication, use --no-github-auth")
             println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
             # Run authentication in a task so we can interrupt it
             auth_task = @task try
-                token_response = GitHubAuth.authenticate()
+                token_response = GitHubAuth.authenticate(dangerous_mode=state.dangerous_github_auth)
                 if GitHubAuth.validate_token(token_response.access_token)
                     state.github_token = token_response.access_token
                     state.github_refresh_token = token_response.refresh_token
-                    save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token)
-                    token_path = joinpath(state.claude_prefix, "github_tokens.json")
+                    save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token, state.dangerous_github_auth)
+                    filename = state.dangerous_github_auth ? "github_tokens_dangerous.json" : "github_tokens.json"
+                    token_path = joinpath(state.claude_prefix, filename)
                     cprintln(GREEN, "✓ GitHub authenticated and token saved")
                     cprintln(YELLOW, "\n⚠️  Warning: Your GitHub token has been persisted to disk.")
                     println("   Token location: $(token_path)")
@@ -203,7 +213,7 @@ function _main(args::Vector{String})::Cint
 
     # Setup environment
     setup_environment!(state)
-    
+
     # Handle .claude_sandbox repository if authenticated
     if !isempty(state.github_token)
         handle_claude_sandbox_repo!(state)
@@ -224,6 +234,7 @@ function parse_args(args::Vector{String})
         "reset_all" => false,
         "work_dir" => pwd(),
         "no_github_auth" => false,
+        "dangerous_github_auth" => false,
         "bash" => false,
         "claude_args" => String[]
     )
@@ -241,6 +252,8 @@ function parse_args(args::Vector{String})
             options["reset_all"] = true
         elseif arg == "--no-github-auth"
             options["no_github_auth"] = true
+        elseif arg == "--dangerous-github-auth"
+            options["dangerous_github_auth"] = true
         elseif arg == "--bash"
             options["bash"] = true
         elseif arg in ["--work-dir", "-w"]
@@ -293,6 +306,7 @@ function print_help()
         --reset             Reset tools (Node.js, npm, git, gh) but keep Claude settings
         --reset-all         Reset everything including Claude settings
         --no-github-auth    Skip GitHub authentication (enabled by default)
+        --dangerous-github-auth  Use GitHub auth with broader permissions (repo creation, etc)
         --bash              Keep bash shell open after claude exits
 
     Unrecognized flags are passed through to the claude command.
@@ -315,27 +329,28 @@ function print_help()
         Your files are mounted at: /workspace
         Node.js is available at: /opt/nodejs/bin/node
         NPM is available at: /opt/nodejs/bin/npm
-        Git is available at: /opt/git/bin/git
+        Git is available at: /opt/build_tools/bin/git
         GitHub CLI is available at: /opt/gh_cli/bin/gh
+        GNU Make is available at: /opt/build_tools/bin/gmake (also as 'make')
         juliaup is available at: /opt/juliaup/bin/juliaup
         Claude-code is automatically installed on first run
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false)::AppState
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
 
     nodejs_dir = joinpath(tools_prefix, "nodejs")
     npm_dir = joinpath(tools_prefix, "npm")
     gh_cli_dir = joinpath(tools_prefix, "gh_cli")
-    git_dir = joinpath(tools_prefix, "git")
+    build_tools_dir = joinpath(tools_prefix, "build_tools")
     juliaup_dir = joinpath(tools_prefix, "juliaup")
     julia_dir = joinpath(tools_prefix, "julia")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
 
     # Ensure directories exist, otherwise the mount will fail
-    for dir in (nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir)
+    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir)
         mkpath(dir)
     end
 
@@ -344,9 +359,9 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     claude_installed = isfile(claude_bin)
 
     # Load existing GitHub tokens if available
-    tokens = load_github_tokens(claude_prefix)
+    tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, git_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth)
 end
 
 
@@ -369,18 +384,18 @@ end
 
 function handle_claude_sandbox_repo!(state::AppState)
     cprintln(BLUE, "Checking for .claude_sandbox repository...")
-    
+
     repo_info = GitHubAuth.check_claude_sandbox_repo(state.github_token)
     if isnothing(repo_info)
         state.claude_sandbox_dir = nothing
         return
     end
-    
+
     cprintln(GREEN, "✓ Found .claude_sandbox repository for $(repo_info.username)")
-    
+
     # Create directory for the repo
     sandbox_repo_dir = joinpath(state.claude_prefix, "claude_sandbox_repo")
-    
+
     # Clone or update the repository
     if isdir(joinpath(sandbox_repo_dir, ".git"))
         # Repository exists, update it
@@ -388,15 +403,15 @@ function handle_claude_sandbox_repo!(state::AppState)
         try
             # Set the token for authentication
             run(`git -C $sandbox_repo_dir config credential.helper store`)
-            
+
             # Create credentials file temporarily
             creds_file = joinpath(state.claude_prefix, "git-credentials")
             write(creds_file, "https://$(repo_info.username):$(state.github_token)@github.com\n")
-            
+
             withenv("HOME" => state.claude_prefix) do
                 run(`git -C $sandbox_repo_dir pull --quiet`)
             end
-            
+
             rm(creds_file; force=true)
             cprintln(GREEN, "  ✓ Repository updated")
         catch e
@@ -407,11 +422,11 @@ function handle_claude_sandbox_repo!(state::AppState)
         cprintln(YELLOW, "  Cloning .claude_sandbox repository...")
         try
             mkpath(dirname(sandbox_repo_dir))
-            
+
             # Clone using token authentication
             clone_url = replace(repo_info.clone_url, "https://github.com/" => "https://$(state.github_token)@github.com/")
             run(`git clone --quiet $clone_url $sandbox_repo_dir`)
-            
+
             cprintln(GREEN, "  ✓ Repository cloned")
         catch e
             cprintln(RED, "  ✗ Failed to clone repository: $e")
@@ -419,21 +434,45 @@ function handle_claude_sandbox_repo!(state::AppState)
             return
         end
     end
-    
+
     state.claude_sandbox_dir = sandbox_repo_dir
 end
 
-function save_github_tokens(claude_prefix::String, access_token::String, refresh_token::Union{String, Nothing}=nothing)
-    token_file = joinpath(claude_prefix, "github_tokens.json")
-    tokens = Dict(
+function save_github_tokens(claude_prefix::String, access_token::String, refresh_token::Union{String, Nothing}=nothing, dangerous_mode::Bool=false)
+    # Use different files for normal vs dangerous mode
+    filename = dangerous_mode ? "github_tokens_dangerous.json" : "github_tokens.json"
+    token_file = joinpath(claude_prefix, filename)
+
+    # Load existing tokens to preserve both sets
+    all_tokens = Dict{String, Any}()
+    for (fname, mode) in [("github_tokens.json", false), ("github_tokens_dangerous.json", true)]
+        fpath = joinpath(claude_prefix, fname)
+        if isfile(fpath)
+            try
+                existing = JSON.parsefile(fpath)
+                all_tokens[mode ? "dangerous" : "normal"] = existing
+            catch
+                # Skip invalid files
+            end
+        end
+    end
+
+    # Update the appropriate token set
+    key = dangerous_mode ? "dangerous" : "normal"
+    all_tokens[key] = Dict(
         "access_token" => access_token,
         "refresh_token" => refresh_token
     )
-    write(token_file, JSON.json(tokens))
+
+    # Save to the appropriate file
+    write(token_file, JSON.json(all_tokens[key]))
 end
 
-function load_github_tokens(claude_prefix::String)
-    token_file = joinpath(claude_prefix, "github_tokens.json")
+function load_github_tokens(claude_prefix::String, dangerous_mode::Bool=false)
+    # Use different files for normal vs dangerous mode
+    filename = dangerous_mode ? "github_tokens_dangerous.json" : "github_tokens.json"
+    token_file = joinpath(claude_prefix, filename)
+
     if isfile(token_file)
         try
             tokens = JSON.parsefile(token_file)
@@ -459,7 +498,7 @@ function setup_environment!(state::AppState)
     mkpath(joinpath(state.npm_dir, "lib"))
     mkpath(joinpath(state.npm_dir, "cache"))
     mkpath(state.gh_cli_dir)
-    mkpath(state.git_dir)
+    mkpath(state.build_tools_dir)
     mkpath(state.claude_home_dir)
 
     # Create claude.json file if it doesn't exist
@@ -467,6 +506,26 @@ function setup_environment!(state::AppState)
     if !isfile(claude_json_path)
         write(claude_json_path, "{}")
     end
+
+    # Create a credential helper script in build_tools
+    credential_helper_path = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
+    mkpath(dirname(credential_helper_path))
+    write(credential_helper_path, """
+#!/bin/sh
+# Git credential helper that uses GitHub CLI
+
+case "\$1" in
+    get)
+        echo "username=x-access-token"
+        echo "password=\$(gh auth token 2>/dev/null)"
+        ;;
+    store|erase)
+        # Ignore store and erase operations
+        exit 0
+        ;;
+esac
+""")
+    chmod(credential_helper_path, 0o755)  # Make it executable
 
     # Create a global gitconfig with SSL settings and user info
     gitconfig_path = joinpath(state.tools_prefix, "gitconfig")
@@ -496,6 +555,12 @@ function setup_environment!(state::AppState)
 [user]
     name = $user_name
     email = $user_email
+[credential]
+    helper = /opt/build_tools/bin/git-credential-gh
+[url "https://github.com/"]
+    insteadOf = git@github.com:
+[url "https://github.com/"]
+    insteadOf = ssh://git@github.com/
 """)
     end
 
@@ -521,12 +586,26 @@ function setup_environment!(state::AppState)
     end
 
     # Check if Git is installed
-    git_bin = joinpath(state.git_dir, "bin", "git")
+    git_bin = joinpath(state.build_tools_dir, "bin", "git")
     if !isfile(git_bin)
         cprintln(YELLOW, "  Installing Git...")
         artifact_paths = collect_artifact_paths(["Git_jll"])
-        deploy_artifact_paths(state.git_dir, artifact_paths)
+        deploy_artifact_paths(state.build_tools_dir, artifact_paths)
         cprintln(GREEN, "  ✓ Git installed")
+    end
+
+    # Check if GNU Make is installed
+    make_bin = joinpath(state.build_tools_dir, "bin", "gmake")
+    if !isfile(make_bin)
+        cprintln(YELLOW, "  Installing GNU Make...")
+        artifact_paths = collect_artifact_paths(["GNUMake_jll"])
+        deploy_artifact_paths(state.build_tools_dir, artifact_paths)
+        # Create a symlink from 'make' to 'gmake' for convenience
+        make_link = joinpath(state.build_tools_dir, "bin", "make")
+        if !isfile(make_link) && !islink(make_link)
+            symlink("gmake", make_link)
+        end
+        cprintln(GREEN, "  ✓ GNU Make installed")
     end
 
     # Check if juliaup is installed
@@ -583,7 +662,7 @@ function setup_environment!(state::AppState)
     println()
 end
 
-const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/git/bin:/opt/git/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
+const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
 
 function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.SandboxConfig
     # Prepare mounts using MountInfo
@@ -592,7 +671,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/opt/nodejs" => Sandbox.MountInfo(state.nodejs_dir, Sandbox.MountType.ReadOnly),
         "/opt/npm" => Sandbox.MountInfo(state.npm_dir, Sandbox.MountType.ReadWrite),
         "/opt/gh_cli" => Sandbox.MountInfo(state.gh_cli_dir, Sandbox.MountType.ReadOnly),
-        "/opt/git" => Sandbox.MountInfo(state.git_dir, Sandbox.MountType.ReadOnly),
+        "/opt/build_tools" => Sandbox.MountInfo(state.build_tools_dir, Sandbox.MountType.ReadOnly),
         "/opt/juliaup" => Sandbox.MountInfo(state.juliaup_dir, Sandbox.MountType.ReadOnly),
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
@@ -600,7 +679,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
         "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite),
         "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite)
     )
-    
+
     # Add claude_sandbox repository if available
     if !isnothing(state.claude_sandbox_dir) && isdir(state.claude_sandbox_dir)
         mounts["/root/.claude_sandbox"] = Sandbox.MountInfo(state.claude_sandbox_dir, Sandbox.MountType.ReadWrite)
@@ -690,6 +769,7 @@ function run_sandbox(state::AppState)
         println("   $(BOLD)npm$(RESET)   - Node Package Manager")
         println("   $(BOLD)git$(RESET)   - Git version control")
         println("   $(BOLD)gh$(RESET)    - GitHub CLI")
+        println("   $(BOLD)make$(RESET)  - GNU Make build tool")
         println("\n💡 To install claude-code:")
         println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
     end
@@ -715,7 +795,7 @@ If you have a `CLAUDE_SANDBOX.md` file in that directory, it contains user-speci
 Please check `/root/.claude_sandbox/CLAUDE_SANDBOX.md` for any custom configurations or instructions.
 """
         end
-        
+
         claude_md_content = """
 # ClaudeBox Sandbox Environment
 
@@ -729,6 +809,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
   - Node.js and npm for JavaScript development
   - Git for version control
   - GitHub CLI (gh) for GitHub operations
+  - GNU Make (gmake/make) for build automation
   - Standard Unix tools
 
 ## Important Notes
@@ -740,7 +821,13 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
 
 ## GitHub Integration
 
-$(isempty(state.github_token) ? "- No GitHub authentication configured" : "- GitHub authenticated - you can use git and gh commands")$claude_sandbox_section
+$(if isempty(state.github_token)
+    "- No GitHub authentication configured"
+elseif state.dangerous_github_auth
+    "- GitHub authenticated with **DANGEROUS** permissions (repository creation, etc.)\n- ⚠️  Use caution with these elevated permissions!"
+else
+    "- GitHub authenticated with standard permissions\n- You can use git and gh commands\n- Repository creation and most admin actions are disabled\n- For broader permissions (repo creation, etc.), ask the user to restart with `claudebox --dangerous-github-auth`"
+end)$claude_sandbox_section
 
 ## Tips
 
@@ -749,7 +836,7 @@ $(isempty(state.github_token) ? "- No GitHub authentication configured" : "- Git
 - The sandbox provides a consistent, clean environment
 """
 
-        run(exe, config, `/bin/sh -c "cat > /CLAUDE.md << 'EOF'
+        run(exe, config, `/bin/sh -c "mkdir /etc/claude-code && cat > /etc/claude-code/CLAUDE.md << 'EOF'
 $claude_md_content
 EOF"`)
 

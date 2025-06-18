@@ -4,7 +4,8 @@ using HTTP
 using JSON
 using GitHub
 
-const CLIENT_ID = "Iv23liWHeR3R9yYlUhqm"
+const DEFAULT_CLIENT_ID = "Iv23liWHeR3R9yYlUhqm"
+const DANGEROUS_CLIENT_ID = "Iv23lixNKn0ZUEkVwNzp"
 const DEVICE_CODE_URL = "https://github.com/login/device/code"
 const ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token"
 
@@ -25,11 +26,11 @@ struct AccessTokenResponse
     refresh_token_expires_in::Union{Int, Nothing}
 end
 
-function request_device_code()
+function request_device_code(client_id::String=DEFAULT_CLIENT_ID)
     response = HTTP.post(
         DEVICE_CODE_URL,
         ["Accept" => "application/json"],
-        "client_id=$(CLIENT_ID)&scope=repo"
+        "client_id=$(client_id)&scope=repo"
     )
     
     if response.status != 200
@@ -46,12 +47,12 @@ function request_device_code()
     )
 end
 
-function poll_for_token(device_code::String, interval::Int)
+function poll_for_token(device_code::String, interval::Int, client_id::String=DEFAULT_CLIENT_ID)
     while true
         response = HTTP.post(
             ACCESS_TOKEN_URL,
             ["Accept" => "application/json"],
-            "client_id=$(CLIENT_ID)&device_code=$(device_code)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
+            "client_id=$(client_id)&device_code=$(device_code)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
         )
         
         data = JSON.parse(String(response.body))
@@ -79,14 +80,18 @@ function poll_for_token(device_code::String, interval::Int)
     end
 end
 
-function authenticate()
-    device_response = request_device_code()
+function authenticate(; dangerous_mode::Bool=false)
+    client_id = dangerous_mode ? DANGEROUS_CLIENT_ID : DEFAULT_CLIENT_ID
+    device_response = request_device_code(client_id)
     
     println("\nPlease visit: $(device_response.verification_uri)")
     println("And enter code: $(device_response.user_code)")
+    if dangerous_mode
+        println("\n⚠️  Using DANGEROUS mode with broader permissions!")
+    end
     println("\nWaiting for authorization (press Ctrl+C to skip)...")
     
-    token_response = poll_for_token(device_response.device_code, device_response.interval)
+    token_response = poll_for_token(device_response.device_code, device_response.interval, client_id)
     
     println("\nAuthentication successful!")
     return token_response
@@ -138,12 +143,13 @@ function get_user_info(token::String)
     return (login = "", name = "", email = "")
 end
 
-function refresh_access_token(refresh_token::String)
+function refresh_access_token(refresh_token::String; dangerous_mode::Bool=false)
+    client_id = dangerous_mode ? DANGEROUS_CLIENT_ID : DEFAULT_CLIENT_ID
     try
         response = HTTP.post(
             ACCESS_TOKEN_URL,
             ["Accept" => "application/json"],
-            "client_id=$(CLIENT_ID)&refresh_token=$(refresh_token)&grant_type=refresh_token"
+            "client_id=$(client_id)&refresh_token=$(refresh_token)&grant_type=refresh_token"
         )
         
         if response.status == 200

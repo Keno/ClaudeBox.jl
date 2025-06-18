@@ -4,6 +4,7 @@ version = "1.0.0"
 authors = ["Claude Assistant"]
 
 [deps]
+GNUMake_jll = "6c1a3432-6b93-5c89-98b5-f3caf0c092ba"
 GitHub = "bc5e4493-9b4d-5f90-b8aa-2b2bcaad7a26"
 Git_jll = "f8c6e375-362e-5223-8a59-34ff63f689eb"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"

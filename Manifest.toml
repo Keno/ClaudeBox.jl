@@ -2,7 +2,7 @@
 
 julia_version = "1.13.0-DEV"
 manifest_format = "2.0"
-project_hash = "a1c4850c8466dfd5f2970cc170fac89100bc31d2"
+project_hash = "5d41ff68e5f76fa9a19b111e575095e75da0243f"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -28,7 +28,7 @@ uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
 version = "0.1.9"
 
 [[deps.ClaudeBox]]
-deps = ["GitHub", "Git_jll", "HTTP", "JLLPrefixes", "JSON", "MozillaCACerts_jll", "NodeJS_22_jll", "Sandbox", "Scratch", "gh_cli_jll", "juliaup_jll"]
+deps = ["GNUMake_jll", "GitHub", "Git_jll", "HTTP", "JLLPrefixes", "JSON", "MozillaCACerts_jll", "NodeJS_22_jll", "REPL", "Sandbox", "Scratch", "gh_cli_jll", "juliaup_jll"]
 path = "."
 uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
 version = "1.0.0"
@@ -80,6 +80,12 @@ version = "2.6.5+0"
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 version = "1.11.0"
+
+[[deps.GNUMake_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "c6262e307d98050db18d977ea623fdb744303f5c"
+uuid = "6c1a3432-6b93-5c89-98b5-f3caf0c092ba"
+version = "4.4.1+0"
 
 [[deps.Git]]
 deps = ["Git_jll", "JLLWrappers", "OpenSSH_jll"]
@@ -356,9 +362,9 @@ uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
 
 [[deps.URIs]]
-git-tree-sha1 = "cbbebadbcc76c5ca1cc4b4f3b0614b3e603b5000"
+git-tree-sha1 = "24c1c558881564e2217dcf7840a8b2e10caeb0f9"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.5.2"
+version = "1.6.0"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]

@@ -67,6 +67,15 @@ Clear all cached data and reinstall:
 ./bin/claudebox --reset
 ```
 
+### GitHub Authentication with Broader Permissions
+
+By default, GitHub authentication uses minimal permissions. For broader access including repository creation:
+```bash
+./bin/claudebox --dangerous-github-auth
+```
+
+⚠️ **Warning**: This mode grants elevated permissions. Use with caution.
+
 ### Help
 
 ```bash
