@@ -18,6 +18,8 @@ Sandbox = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
 Scratch = "6c6a2e73-6563-6170-7368-637461726353"
 gh_cli_jll = "5d31d589-30fb-542f-b82d-10325e863e38"
 juliaup_jll = "038fdbe3-3777-5af9-9568-3738956aeb97"
+less_jll = "80e8a3d7-96cb-5b92-b346-c3bbc7c9cf8e"
+procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
 ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
 [sources]
@@ -30,5 +32,6 @@ REPL = "1.11.0"
 Sandbox = "2.1"
 Scratch = "1.2"
 julia = "1.6"
+ripgrep_jll = "13.0.0"
 
 [apps.claudebox]

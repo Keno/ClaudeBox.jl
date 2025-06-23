@@ -11,6 +11,8 @@ using MozillaCACerts_jll
 using juliaup_jll
 using ripgrep_jll
 using Python_jll
+using less_jll
+using procps_jll
 using JSON
 using HTTP
 using REPL.Terminals: raw!, TTYTerminal
@@ -336,6 +338,8 @@ function print_help()
         GNU Make is available at: /opt/build_tools/bin/make
         ripgrep is available at: /opt/build_tools/bin/rg
         Python is available at: /opt/build_tools/bin/python3
+        less is available at: /opt/build_tools/bin/less
+        procps is available at: /opt/build_tools/bin/ps
         juliaup is available at: /opt/juliaup/bin/juliaup
         Claude-code is automatically installed on first run
     """)
@@ -510,12 +514,12 @@ function install_jll_tool(tool_name::String, jll_name::String, bin_path::String,
         cprintln(YELLOW, "  Installing $tool_name...")
         artifact_paths = collect_artifact_paths([jll_name])
         deploy_artifact_paths(install_dir, artifact_paths)
-        
+
         # Run post-install hook if provided
         if !isnothing(post_install)
             post_install()
         end
-        
+
         cprintln(GREEN, "  ✓ $tool_name installed")
         return true
     end
@@ -607,33 +611,38 @@ esac
     gh_bin = joinpath(state.gh_cli_dir, "bin", "gh")
     install_jll_tool("GitHub CLI", "gh_cli_jll", gh_bin, state.gh_cli_dir)
 
-    # Check if Git is installed
+    # Check if all build tools are installed
+    # Install all build tools together to avoid file conflicts
     git_bin = joinpath(state.build_tools_dir, "bin", "git")
-    install_jll_tool("Git", "Git_jll", git_bin, state.build_tools_dir)
-
-    # Check if GNU Make is installed
     make_bin = joinpath(state.build_tools_dir, "bin", "make")
-    gmake_bin = joinpath(state.build_tools_dir, "bin", "gmake")
-    if !isfile(make_bin) && !isfile(gmake_bin)
-        install_jll_tool("GNU Make", "GNUMake_jll", gmake_bin, state.build_tools_dir) do
-            # If gmake exists but make doesn't, create symlink
-            if isfile(gmake_bin) && !isfile(make_bin) && !islink(make_bin)
-                symlink("gmake", make_bin)
-            end
+    rg_bin = joinpath(state.build_tools_dir, "bin", "rg")
+    python_bin = joinpath(state.build_tools_dir, "bin", "python3")
+    less_bin = joinpath(state.build_tools_dir, "bin", "less")
+    ps_bin = joinpath(state.build_tools_dir, "bin", "ps")
+    
+    # If any build tool is missing, reinstall all of them together
+    if !isfile(git_bin) || !isfile(make_bin) || !isfile(rg_bin) || 
+       !isfile(python_bin) || !isfile(less_bin) || !isfile(ps_bin)
+        cprintln(YELLOW, "  Installing build tools...")
+        
+        # Remove the entire build tools directory to ensure clean installation
+        if isdir(state.build_tools_dir)
+            rm(state.build_tools_dir; recursive=true, force=true)
         end
+        mkpath(state.build_tools_dir)
+        
+        # Collect all build tool artifacts together
+        build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll", 
+                           "Python_jll", "less_jll", "procps_jll"]
+        artifact_paths = collect_artifact_paths(build_tools_jlls)
+        deploy_artifact_paths(state.build_tools_dir, artifact_paths)
+        
+        cprintln(GREEN, "  ✓ Build tools installed")
     end
 
-    # Check if juliaup is installed
+    # Check if juliaup is installed (separate from build tools)
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
     install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
-
-    # Check if ripgrep is installed
-    rg_bin = joinpath(state.build_tools_dir, "bin", "rg")
-    install_jll_tool("ripgrep", "ripgrep_jll", rg_bin, state.build_tools_dir)
-
-    # Check if Python is installed
-    python_bin = joinpath(state.build_tools_dir, "bin", "python3")
-    install_jll_tool("Python", "Python_jll", python_bin, state.build_tools_dir)
 
     # Check if claude is installed
     claude_bin = joinpath(state.npm_dir, "bin", "claude")
@@ -645,7 +654,6 @@ esac
         # Try to install claude-code automatically
         println()
         cprintln(YELLOW, "Installing claude-code...")
-        println("  This may take a few minutes on first run...")
 
         # Create sandbox config for installation
         config = create_sandbox_config(state)
@@ -790,6 +798,8 @@ function run_sandbox(state::AppState)
         println("   $(BOLD)make$(RESET)  - GNU Make build tool")
         println("   $(BOLD)rg$(RESET)    - ripgrep (fast search)")
         println("   $(BOLD)python3$(RESET) - Python interpreter")
+        println("   $(BOLD)less$(RESET)  - File viewer/pager")
+        println("   $(BOLD)ps$(RESET)    - Process utilities (procps)")
         println("\n💡 To install claude-code:")
         println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
     end
@@ -832,6 +842,8 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
   - GNU Make (make) for build automation
   - ripgrep (rg) for fast text searching
   - Python 3 for Python development
+  - less for file viewing and pagination
+  - procps utilities (ps, pgrep, top, etc.) for process management
   - Standard Unix tools
 
 ## Important Notes

@@ -3,4 +3,5 @@
 # This is the entry point script for the ClaudeBox
 # It follows the Pkg.jl app format convention
 
+using Pkg
 using ClaudeBox
