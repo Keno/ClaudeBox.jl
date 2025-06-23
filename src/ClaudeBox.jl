@@ -543,25 +543,6 @@ function setup_environment!(state::AppState)
         write(claude_json_path, "{}")
     end
 
-    # Create a credential helper script in build_tools
-    credential_helper_path = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
-    mkpath(dirname(credential_helper_path))
-    write(credential_helper_path, """
-#!/bin/sh
-# Git credential helper that uses GitHub CLI
-
-case "\$1" in
-    get)
-        echo "username=x-access-token"
-        echo "password=\$(gh auth token 2>/dev/null)"
-        ;;
-    store|erase)
-        # Ignore store and erase operations
-        exit 0
-        ;;
-esac
-""")
-    chmod(credential_helper_path, 0o755)  # Make it executable
 
     # Create a global gitconfig with SSL settings and user info
     gitconfig_path = joinpath(state.tools_prefix, "gitconfig")
@@ -638,6 +619,26 @@ esac
         
         cprintln(GREEN, "  ✓ Build tools installed")
     end
+    
+    # Create a credential helper script in build_tools (after build tools are installed)
+    credential_helper_path = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
+    mkpath(dirname(credential_helper_path))
+    write(credential_helper_path, """
+#!/bin/sh
+# Git credential helper that uses GitHub CLI
+
+case "\$1" in
+    get)
+        echo "username=x-access-token"
+        echo "password=\$(gh auth token 2>/dev/null)"
+        ;;
+    store|erase)
+        # Ignore store and erase operations
+        exit 0
+        ;;
+esac
+""")
+    chmod(credential_helper_path, 0o755)  # Make it executable
 
     # Check if juliaup is installed (separate from build tools)
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
