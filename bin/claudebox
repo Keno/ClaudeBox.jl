@@ -4,4 +4,4 @@
 # It follows the Pkg.jl app format convention
 
 using Pkg
-using ClaudeBox
+using ClaudeBox: main
