@@ -1,5 +1,7 @@
 # ClaudeBox
 
+[![CI](https://github.com/Keno/ClaudeBox.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/Keno/ClaudeBox.jl/actions/workflows/ci.yml)
+
 A Julia application that runs claude-code in an isolated sandbox environment using Linux namespaces.
 
 ## Important Notes
