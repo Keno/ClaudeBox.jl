@@ -65,7 +65,7 @@ using ClaudeBox
         @test contains(gitconfig_content, "insteadOf = ssh://git@github.com/")
         
         # Verify credential helper script exists
-        credential_helper_path = joinpath(state.tools_prefix, "build_tools", "bin", "git-credential-gh")
+        credential_helper_path = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
         @test isfile(credential_helper_path)
         
         # Verify mount configuration includes gitconfig
