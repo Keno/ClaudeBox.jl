@@ -20,7 +20,6 @@ using REPL.Terminals: raw!, TTYTerminal
 include("github_auth.jl")
 using .GitHubAuth
 
-export main
 
 # Terminal colors
 const GREEN = "\033[32m"
@@ -642,7 +641,37 @@ esac
 
     # Check if juliaup is installed (separate from build tools)
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
-    install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
+    if install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
+        # juliaup was just installed, set up nightly as default and install General registry
+        cprintln(YELLOW, "  Setting up Julia nightly and General registry...")
+        
+        # Create sandbox config for Julia setup
+        config = create_sandbox_config(state)
+        
+        success = Sandbox.with_executor() do exe
+            try
+                # First add nightly channel
+                run(exe, config, `/opt/juliaup/bin/juliaup add nightly`)
+                
+                # Then set it as default
+                run(exe, config, `/opt/juliaup/bin/juliaup default nightly`)
+                
+                # Install the General registry using nightly Julia
+                run(exe, config, `/opt/juliaup/bin/julia +nightly -e "using Pkg; Pkg.Registry.add(\"General\")"`)
+                
+                cprintln(GREEN, "  ✓ Julia nightly set as default and General registry installed")
+                return true
+            catch e
+                cprintln(YELLOW, "  ⚠ Failed to set up Julia nightly or General registry")
+                println("    Error: $e")
+                println("    You can set it up manually in the sandbox:")
+                println("    $(BOLD)juliaup add nightly$(RESET)")
+                println("    $(BOLD)juliaup default nightly$(RESET)")
+                println("    $(BOLD)julia +nightly -e \"using Pkg; Pkg.Registry.add(\\\"General\\\")\"$(RESET)")
+                return false
+            end
+        end
+    end
 
     # Check if claude is installed
     claude_bin = joinpath(state.npm_dir, "bin", "claude")
@@ -758,7 +787,6 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
             "LANG" => "C.UTF-8",
             "USER" => "root",
             "SSL_CERT_FILE" => "/etc/ssl/certs/ca-certificates.crt",
-            "SSL_CERT_DIR" => "/etc/ssl/certs",
             "GIT_SSL_CAINFO" => "/etc/ssl/certs/ca-certificates.crt",
             "JULIA_DEPOT_PATH" => "/root/.julia",
             "GIT_SSL_CAPATH" => "/etc/ssl/certs",
@@ -798,6 +826,7 @@ function run_sandbox(state::AppState)
         println("   $(BOLD)make$(RESET)  - GNU Make build tool")
         println("   $(BOLD)rg$(RESET)    - ripgrep (fast search)")
         println("   $(BOLD)python3$(RESET) - Python interpreter")
+        println("   $(BOLD)julia$(RESET) - Julia (nightly) via juliaup")
         println("   $(BOLD)less$(RESET)  - File viewer/pager")
         println("   $(BOLD)ps$(RESET)    - Process utilities (procps)")
         println("\n💡 To install claude-code:")
@@ -842,6 +871,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
   - GNU Make (make) for build automation
   - ripgrep (rg) for fast text searching
   - Python 3 for Python development
+  - Julia (nightly) via juliaup for Julia development
   - less for file viewing and pagination
   - procps utilities (ps, pgrep, top, etc.) for process management
   - Standard Unix tools

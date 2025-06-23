@@ -33,6 +33,46 @@ using ClaudeBox
         @test state.work_dir == pwd()
         @test state.claude_args == String[]
     end
+    
+    @testset "Git Config in Sandbox" begin
+        # Create a test state and set up environment
+        state = ClaudeBox.initialize_state(pwd())
+        ClaudeBox.setup_environment!(state)
+        
+        # Create sandbox config
+        config = ClaudeBox.create_sandbox_config(state)
+        
+        # Verify that gitconfig file is created
+        gitconfig_path = joinpath(state.tools_prefix, "gitconfig")
+        @test isfile(gitconfig_path)
+        
+        # Read and verify gitconfig contents
+        gitconfig_content = read(gitconfig_path, String)
+        
+        # Verify expected sections and keys
+        @test contains(gitconfig_content, "[http]")
+        @test contains(gitconfig_content, "sslCAInfo = /etc/ssl/certs/ca-certificates.crt")
+        
+        @test contains(gitconfig_content, "[user]")
+        @test contains(gitconfig_content, "name =")
+        @test contains(gitconfig_content, "email =")
+        
+        @test contains(gitconfig_content, "[credential]")
+        @test contains(gitconfig_content, "helper = /opt/build_tools/bin/git-credential-gh")
+        
+        @test contains(gitconfig_content, "[url \"https://github.com/\"]")
+        @test contains(gitconfig_content, "insteadOf = git@github.com:")
+        @test contains(gitconfig_content, "insteadOf = ssh://git@github.com/")
+        
+        # Verify credential helper script exists
+        credential_helper_path = joinpath(state.tools_prefix, "build_tools", "bin", "git-credential-gh")
+        @test isfile(credential_helper_path)
+        
+        # Verify mount configuration includes gitconfig
+        mounts = config.mounts
+        @test haskey(mounts, "/root/.gitconfig")
+        @test mounts["/root/.gitconfig"].host_path == gitconfig_path
+    end
 end
 
 println("\nAll tests passed!")
