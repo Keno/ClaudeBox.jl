@@ -28,10 +28,10 @@ Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}
 [compat]
 JLLPrefixes = "0.3"
 NodeJS_22_jll = "22"
-REPL = "1.11.0"
+REPL = "1.10"
 Sandbox = "2.1"
 Scratch = "1.2"
-julia = "1.6"
+julia = "1.10"
 ripgrep_jll = "13.0.0"
 
 [apps.claudebox]
