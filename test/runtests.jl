@@ -73,6 +73,28 @@ using ClaudeBox
         @test haskey(mounts, "/root/.gitconfig")
         @test mounts["/root/.gitconfig"].host_path == gitconfig_path
     end
+    
+    @testset "Build Tools Installation" begin
+        # Create a test state and set up environment
+        state = ClaudeBox.initialize_state(pwd())
+        ClaudeBox.setup_environment!(state)
+        
+        # Verify all build tools are installed using the same function as the main code
+        @test ClaudeBox.are_all_build_tools_installed(state) == true
+        
+        # Also verify individual tools to ensure the function is checking correctly
+        @test isfile(joinpath(state.build_tools_dir, "bin", "git"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "make"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "rg"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "python3"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "less"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "ps"))
+        @test isfile(joinpath(state.build_tools_dir, "tools", "clang"))
+        
+        # Verify other tools
+        @test isfile(joinpath(state.nodejs_dir, "bin", "node"))
+        @test isfile(joinpath(state.gh_cli_dir, "bin", "gh"))
+    end
 end
 
 println("\nAll tests passed!")

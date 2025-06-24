@@ -525,6 +525,24 @@ function install_jll_tool(tool_name::String, jll_name::String, bin_path::String,
     return false
 end
 
+"""
+    are_all_build_tools_installed(state::AppState) -> Bool
+
+Check if all required build tools are installed in the expected locations.
+"""
+function are_all_build_tools_installed(state::AppState)
+    git_bin = joinpath(state.build_tools_dir, "bin", "git")
+    make_bin = joinpath(state.build_tools_dir, "bin", "make")
+    rg_bin = joinpath(state.build_tools_dir, "bin", "rg")
+    python_bin = joinpath(state.build_tools_dir, "bin", "python3")
+    less_bin = joinpath(state.build_tools_dir, "bin", "less")
+    ps_bin = joinpath(state.build_tools_dir, "bin", "ps")
+    clang_bin = joinpath(state.build_tools_dir, "tools", "clang")
+    
+    return isfile(git_bin) && isfile(make_bin) && isfile(rg_bin) && 
+           isfile(python_bin) && isfile(less_bin) && isfile(ps_bin) && isfile(clang_bin)
+end
+
 function setup_environment!(state::AppState)
     cprint(BLUE, "Setting up environment...")
 
@@ -593,16 +611,7 @@ function setup_environment!(state::AppState)
 
     # Check if all build tools are installed
     # Install all build tools together to avoid file conflicts
-    git_bin = joinpath(state.build_tools_dir, "bin", "git")
-    make_bin = joinpath(state.build_tools_dir, "bin", "make")
-    rg_bin = joinpath(state.build_tools_dir, "bin", "rg")
-    python_bin = joinpath(state.build_tools_dir, "bin", "python3")
-    less_bin = joinpath(state.build_tools_dir, "bin", "less")
-    ps_bin = joinpath(state.build_tools_dir, "bin", "ps")
-    
-    # If any build tool is missing, reinstall all of them together
-    if !isfile(git_bin) || !isfile(make_bin) || !isfile(rg_bin) || 
-       !isfile(python_bin) || !isfile(less_bin) || !isfile(ps_bin)
+    if !are_all_build_tools_installed(state)
         cprintln(YELLOW, "  Installing build tools...")
         
         # Remove the entire build tools directory to ensure clean installation
@@ -613,7 +622,7 @@ function setup_environment!(state::AppState)
         
         # Collect all build tool artifacts together
         build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll", 
-                           "Python_jll", "less_jll", "procps_jll"]
+                           "Python_jll", "less_jll", "procps_jll", "Clang_jll"]
         artifact_paths = collect_artifact_paths(build_tools_jlls)
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
         
@@ -718,7 +727,7 @@ esac
     println()
 end
 
-const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
+const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
 
 function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.SandboxConfig
     # Prepare mounts using MountInfo
@@ -830,6 +839,7 @@ function run_sandbox(state::AppState)
         println("   $(BOLD)julia$(RESET) - Julia (nightly) via juliaup")
         println("   $(BOLD)less$(RESET)  - File viewer/pager")
         println("   $(BOLD)ps$(RESET)    - Process utilities (procps)")
+        println("   $(BOLD)clang$(RESET) - C/C++ compiler")
         println("\n💡 To install claude-code:")
         println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
     end
