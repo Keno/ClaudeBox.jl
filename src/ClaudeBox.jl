@@ -539,13 +539,13 @@ function are_all_build_tools_installed(state::AppState)
     ps_bin = joinpath(state.build_tools_dir, "bin", "ps")
     clang_bin = joinpath(state.build_tools_dir, "tools", "clang")
     # Binutils provides many tools, we'll check for a few key ones
-    ld_bin = joinpath(state.build_tools_dir, "bin", "ld")
-    as_bin = joinpath(state.build_tools_dir, "bin", "as")
+    ar_bin = joinpath(state.build_tools_dir, "bin", "ar")
+    nm_bin = joinpath(state.build_tools_dir, "bin", "nm")
     objdump_bin = joinpath(state.build_tools_dir, "bin", "objdump")
     
     return isfile(git_bin) && isfile(make_bin) && isfile(rg_bin) && 
            isfile(python_bin) && isfile(less_bin) && isfile(ps_bin) && isfile(clang_bin) &&
-           isfile(ld_bin) && isfile(as_bin) && isfile(objdump_bin)
+           isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin)
 end
 
 function setup_environment!(state::AppState)
@@ -857,7 +857,7 @@ function run_sandbox(state::AppState)
         println("   $(BOLD)less$(RESET)  - File viewer/pager")
         println("   $(BOLD)ps$(RESET)    - Process utilities (procps)")
         println("   $(BOLD)clang$(RESET) - C/C++ compiler")
-        println("   $(BOLD)ld/as/ar$(RESET) - Binutils (linker, assembler, archiver)")
+        println("   $(BOLD)ar/nm/objdump$(RESET) - Binutils (archiver, symbols, disassembler)")
         println("\n💡 To install claude-code:")
         println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
     end
