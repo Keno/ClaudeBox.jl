@@ -1,7 +1,7 @@
 name = "ClaudeBox"
 uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
-version = "1.0.0"
 authors = ["Claude Assistant"]
+version = "1.0.0"
 
 [deps]
 GNUMake_jll = "6c1a3432-6b93-5c89-98b5-f3caf0c092ba"
@@ -22,11 +22,13 @@ less_jll = "80e8a3d7-96cb-5b92-b346-c3bbc7c9cf8e"
 procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
 ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
-[sources]
-Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}
+[sources.Sandbox]
+rev = "main"
+url = "https://github.com/staticfloat/Sandbox.jl#main"
 
 [compat]
 JLLPrefixes = "0.3"
+JSON = "0.21"
 NodeJS_22_jll = "22"
 REPL = "1.10"
 Sandbox = "2.1"
