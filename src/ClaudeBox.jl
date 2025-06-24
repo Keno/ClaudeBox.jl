@@ -13,6 +13,9 @@ using ripgrep_jll
 using Python_jll
 using less_jll
 using procps_jll
+using Clang_jll
+using Binutils_jll
+using LLD_jll
 using JSON
 using HTTP
 using REPL.Terminals: raw!, TTYTerminal
@@ -339,6 +342,9 @@ function print_help()
         Python is available at: /opt/build_tools/bin/python3
         less is available at: /opt/build_tools/bin/less
         procps is available at: /opt/build_tools/bin/ps
+        Clang is available at: /opt/build_tools/tools/clang
+        Binutils is available at: /opt/build_tools/bin/ar, nm, objdump, etc.
+        LLD (LLVM Linker) is available at: /opt/build_tools/tools/lld
         juliaup is available at: /opt/juliaup/bin/juliaup
         Claude-code is automatically installed on first run
     """)
@@ -542,10 +548,12 @@ function are_all_build_tools_installed(state::AppState)
     ar_bin = joinpath(state.build_tools_dir, "bin", "ar")
     nm_bin = joinpath(state.build_tools_dir, "bin", "nm")
     objdump_bin = joinpath(state.build_tools_dir, "bin", "objdump")
+    # LLD provides the LLVM linker
+    lld_bin = joinpath(state.build_tools_dir, "tools", "lld")
     
     return isfile(git_bin) && isfile(make_bin) && isfile(rg_bin) && 
            isfile(python_bin) && isfile(less_bin) && isfile(ps_bin) && isfile(clang_bin) &&
-           isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin)
+           isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin) && isfile(lld_bin)
 end
 
 function setup_environment!(state::AppState)
@@ -627,7 +635,7 @@ function setup_environment!(state::AppState)
         
         # Collect all build tool artifacts together
         build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll", 
-                           "Python_jll", "less_jll", "procps_jll", "Clang_jll", "Binutils_jll"]
+                           "Python_jll", "less_jll", "procps_jll", "Clang_jll", "Binutils_jll", "LLD_jll"]
         artifact_paths = collect_artifact_paths(build_tools_jlls)
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
         

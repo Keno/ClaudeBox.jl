@@ -99,6 +99,9 @@ using ClaudeBox
         @test isfile(joinpath(state.build_tools_dir, "bin", "strip"))
         @test isfile(joinpath(state.build_tools_dir, "bin", "readelf"))
         
+        # Verify LLD (LLVM linker)
+        @test isfile(joinpath(state.build_tools_dir, "tools", "lld"))
+        
         # Verify other tools
         @test isfile(joinpath(state.nodejs_dir, "bin", "node"))
         @test isfile(joinpath(state.gh_cli_dir, "bin", "gh"))
