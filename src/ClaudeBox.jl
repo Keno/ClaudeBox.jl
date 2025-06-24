@@ -17,6 +17,8 @@ using Clang_jll
 using Binutils_jll
 using LLD_jll
 using CURL_jll
+using GCC_crt_objects_jll
+using GCC_support_libraries_jll
 using JSON
 using HTTP
 using REPL.Terminals: raw!, TTYTerminal
@@ -639,7 +641,8 @@ function setup_environment!(state::AppState)
         
         # Collect all build tool artifacts together
         build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll", 
-                           "Python_jll", "less_jll", "procps_jll", "Clang_jll", "Binutils_jll", "LLD_jll", "CURL_jll"]
+                           "Python_jll", "less_jll", "procps_jll", "Clang_jll", "Binutils_jll", "LLD_jll", "CURL_jll",
+                           "GCC_crt_objects_jll", "GCC_support_libraries_jll"]
         artifact_paths = collect_artifact_paths(build_tools_jlls)
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
         

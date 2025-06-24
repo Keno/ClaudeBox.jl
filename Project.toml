@@ -7,6 +7,8 @@ authors = ["Claude Assistant"]
 Binutils_jll = "489e263e-5428-50b0-a723-147a141b401e"
 CURL_jll = "b21e61f3-bafc-59ac-ab14-4c5c62d6588d"
 Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
+GCC_crt_objects_jll = "7bc14925-bf4e-535d-80f2-90698dc22d13"
+GCC_support_libraries_jll = "465c4c53-7f13-5720-b733-07d6cbd50c3b"
 GNUMake_jll = "6c1a3432-6b93-5c89-98b5-f3caf0c092ba"
 GitHub = "bc5e4493-9b4d-5f90-b8aa-2b2bcaad7a26"
 Git_jll = "f8c6e375-362e-5223-8a59-34ff63f689eb"
@@ -27,9 +29,12 @@ procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
 ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
 [sources]
+GCC_crt_objects_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"}
+GCC_support_libraries_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"}
 Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}
 
 [compat]
+GCC_support_libraries_jll = "14.2.0"
 JLLPrefixes = "0.3"
 NodeJS_22_jll = "22"
 REPL = "1.10"
