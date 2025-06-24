@@ -91,6 +91,14 @@ using ClaudeBox
         @test isfile(joinpath(state.build_tools_dir, "bin", "ps"))
         @test isfile(joinpath(state.build_tools_dir, "tools", "clang"))
         
+        # Verify binutils tools
+        @test isfile(joinpath(state.build_tools_dir, "bin", "ld"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "as"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "objdump"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "ar"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "nm"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "strip"))
+        
         # Verify other tools
         @test isfile(joinpath(state.nodejs_dir, "bin", "node"))
         @test isfile(joinpath(state.gh_cli_dir, "bin", "gh"))
