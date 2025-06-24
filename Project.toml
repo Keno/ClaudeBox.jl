@@ -5,6 +5,7 @@ authors = ["Claude Assistant"]
 
 [deps]
 Binutils_jll = "489e263e-5428-50b0-a723-147a141b401e"
+CURL_jll = "b21e61f3-bafc-59ac-ab14-4c5c62d6588d"
 Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
 GNUMake_jll = "6c1a3432-6b93-5c89-98b5-f3caf0c092ba"
 GitHub = "bc5e4493-9b4d-5f90-b8aa-2b2bcaad7a26"

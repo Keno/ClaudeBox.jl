@@ -102,6 +102,9 @@ using ClaudeBox
         # Verify LLD (LLVM linker)
         @test isfile(joinpath(state.build_tools_dir, "tools", "lld"))
         
+        # Verify curl
+        @test isfile(joinpath(state.build_tools_dir, "bin", "curl"))
+        
         # Verify other tools
         @test isfile(joinpath(state.nodejs_dir, "bin", "node"))
         @test isfile(joinpath(state.gh_cli_dir, "bin", "gh"))
