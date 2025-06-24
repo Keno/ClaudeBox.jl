@@ -1,0 +1,20 @@
+# Julia artifacts and compiled files
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+*.ji
+compiled/
+
+# Dependency manifests
+Manifest.toml
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

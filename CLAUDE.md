@@ -1,5 +1,7 @@
 # ClaudeBox Development Notes
 
+ClaudeBox is a sandboxed Julia REPL environment that provides a secure, isolated workspace with pre-installed development tools. It allows users to run Julia code, Node.js applications, and various command-line tools in a controlled environment while maintaining access to their local workspace directory.
+
 ## Important Reminders
 
 ### Manifest.toml
