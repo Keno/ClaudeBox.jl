@@ -8,10 +8,12 @@ Binutils_jll = "489e263e-5428-50b0-a723-147a141b401e"
 CURL_jll = "b21e61f3-bafc-59ac-ab14-4c5c62d6588d"
 Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
 GCC_crt_objects_jll = "7bc14925-bf4e-535d-80f2-90698dc22d13"
+GCC_jll = "ec15993a-68c6-5861-8652-ef539d7ffb0b"
 GCC_support_libraries_jll = "465c4c53-7f13-5720-b733-07d6cbd50c3b"
 GNUMake_jll = "6c1a3432-6b93-5c89-98b5-f3caf0c092ba"
 GitHub = "bc5e4493-9b4d-5f90-b8aa-2b2bcaad7a26"
 Git_jll = "f8c6e375-362e-5223-8a59-34ff63f689eb"
+Glibc_jll = "452aa2e7-e185-58db-8ff9-d3c1fa4bc997"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JLLPrefixes = "afc68a34-7891-4c5a-9da1-1c62935e7b0d"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
@@ -29,12 +31,19 @@ procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
 ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
 [sources]
+Binutils_jll = {rev = "main", url = "https://github.com/staticfloat/Binutils_jll.jl"}
 GCC_crt_objects_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"}
+GCC_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_jll.jl"}
 GCC_support_libraries_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"}
+Glibc_jll = {rev = "main", url = "https://github.com/staticfloat/Glibc_jll.jl"}
+JLLPrefixes = {rev = "from-current-manifest", url = "https://github.com/KenoAIStaging/JLLPrefixes.jl"}
 Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}
 
 [compat]
+Binutils_jll = "2.41.1"
+GCC_jll = "14.2.0"
 GCC_support_libraries_jll = "14.2.0"
+Glibc_jll = "2.19.1"
 JLLPrefixes = "0.3"
 NodeJS_22_jll = "22"
 REPL = "1.10"

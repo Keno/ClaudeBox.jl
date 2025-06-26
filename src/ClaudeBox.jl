@@ -3,22 +3,7 @@ module ClaudeBox
 using Sandbox
 using JLLPrefixes
 using Scratch
-using NodeJS_22_jll
-using gh_cli_jll
-using Git_jll
-using GNUMake_jll
 using MozillaCACerts_jll
-using juliaup_jll
-using ripgrep_jll
-using Python_jll
-using less_jll
-using procps_jll
-using Clang_jll
-using Binutils_jll
-using LLD_jll
-using CURL_jll
-using GCC_crt_objects_jll
-using GCC_support_libraries_jll
 using JSON
 using HTTP
 using REPL.Terminals: raw!, TTYTerminal
@@ -52,6 +37,7 @@ mutable struct AppState
     npm_dir::String
     gh_cli_dir::String
     build_tools_dir::String
+    sysroot_dir::String
     juliaup_dir::String
     julia_dir::String
     claude_home_dir::String
@@ -369,13 +355,14 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     npm_dir = joinpath(tools_prefix, "npm")
     gh_cli_dir = joinpath(tools_prefix, "gh_cli")
     build_tools_dir = joinpath(tools_prefix, "build_tools")
+    sysroot_dir = joinpath(tools_prefix, "sysroot")
     juliaup_dir = joinpath(tools_prefix, "juliaup")
     julia_dir = joinpath(tools_prefix, "julia")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
     gemini_home_dir = joinpath(claude_prefix, "gemini_home")
 
     # Ensure directories exist, otherwise the mount will fail
-    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir)
+    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, sysroot_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir)
         mkpath(dir)
     end
 
@@ -389,7 +376,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, sysroot_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
 end
 
 """
@@ -558,7 +545,12 @@ Install a JLL tool if it's not already installed.
 function install_jll_tool(tool_name::String, jll_name::String, bin_path::String, install_dir::String; post_install=nothing)
     if !isfile(bin_path)
         cprintln(YELLOW, "  Installing $tool_name...")
-        artifact_paths = collect_artifact_paths([jll_name])
+        # Create platform with glibc target and host arch
+        platform = Base.BinaryPlatforms.HostPlatform()
+        platform["target_libc"] = "glibc"
+        platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
+
+        artifact_paths = collect_artifact_paths([jll_name]; from_current_manifest=true, platform=platform)
         deploy_artifact_paths(install_dir, artifact_paths)
 
         # Run post-install hook if provided
@@ -589,14 +581,18 @@ function are_all_build_tools_installed(state::AppState)
     ar_bin = joinpath(state.build_tools_dir, "bin", "ar")
     nm_bin = joinpath(state.build_tools_dir, "bin", "nm")
     objdump_bin = joinpath(state.build_tools_dir, "bin", "objdump")
+    ld_bin = joinpath(state.build_tools_dir, "bin", "ld")
     # LLD provides the LLVM linker
     lld_bin = joinpath(state.build_tools_dir, "tools", "lld")
     # CURL provides the curl command-line tool
     curl_bin = joinpath(state.build_tools_dir, "bin", "curl")
+    # GCC provides the GNU compiler
+    gcc_bin = joinpath(state.build_tools_dir, "bin", "gcc")
 
     return isfile(git_bin) && isfile(make_bin) && isfile(rg_bin) &&
            isfile(python_bin) && isfile(less_bin) && isfile(ps_bin) && isfile(clang_bin) &&
-           isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin) && isfile(lld_bin) && isfile(curl_bin)
+           isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin) && isfile(ld_bin) && isfile(lld_bin) && isfile(curl_bin) &&
+           isfile(gcc_bin)
 end
 
 function setup_environment!(state::AppState)
@@ -676,14 +672,36 @@ function setup_environment!(state::AppState)
         end
         mkpath(state.build_tools_dir)
 
-        # Collect all build tool artifacts together
+        # Collect build tool artifacts (excluding Glibc and GCC)
         build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll",
-                           "Python_jll", "less_jll", "procps_jll", "Clang_jll", "Binutils_jll", "LLD_jll", "CURL_jll",
-                           #= "GCC_crt_objects_jll", "GCC_support_libraries_jll" =#]
-        artifact_paths = collect_artifact_paths(build_tools_jlls)
+                           "Python_jll", "less_jll", "procps_jll", "Clang_jll", "LLD_jll", "CURL_jll",
+                           "GCC_crt_objects_jll", "GCC_support_libraries_jll"]
+
+        # Create platform with glibc target and host arch
+        platform = Base.BinaryPlatforms.HostPlatform()
+        platform["target_libc"] = "glibc"
+        platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
+
+        artifact_paths = collect_artifact_paths(build_tools_jlls; from_current_manifest=true, platform=platform)
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
 
         cprintln(GREEN, "  ✓ Build tools installed")
+    end
+
+    # Install sysroot components (Glibc and GCC)
+    sysroot_jlls = ["Glibc_jll", "GCC_jll", "Binutils_jll"]
+    if !isdir(joinpath(state.sysroot_dir, "lib"))
+        cprintln(YELLOW, "  Installing sysroot...")
+
+        # Create platform with glibc target and host arch
+        platform = Base.BinaryPlatforms.HostPlatform()
+        platform["target_libc"] = "glibc"
+        platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
+
+        artifact_paths = collect_artifact_paths(sysroot_jlls; from_current_manifest=true, platform=platform)
+        deploy_artifact_paths(state.sysroot_dir, artifact_paths)
+
+        cprintln(GREEN, "  ✓ Sysroot installed")
     end
 
     # Create a credential helper script in build_tools (after build tools are installed)
@@ -743,7 +761,7 @@ esac
     # Check if claude is installed
     claude_bin = joinpath(state.npm_dir, "bin", "claude")
     state.claude_installed = isfile(claude_bin)
-    
+
     # Check if gemini is installed
     gemini_bin = joinpath(state.npm_dir, "bin", "gemini")
     state.gemini_installed = isfile(gemini_bin)
@@ -818,6 +836,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/opt/npm" => Sandbox.MountInfo(state.npm_dir, Sandbox.MountType.ReadWrite),
         "/opt/gh_cli" => Sandbox.MountInfo(state.gh_cli_dir, Sandbox.MountType.ReadOnly),
         "/opt/build_tools" => Sandbox.MountInfo(state.build_tools_dir, Sandbox.MountType.ReadOnly),
+        "/opt/sysroot" => Sandbox.MountInfo(state.sysroot_dir, Sandbox.MountType.ReadOnly),
         "/opt/juliaup" => Sandbox.MountInfo(state.juliaup_dir, Sandbox.MountType.ReadOnly),
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
@@ -933,19 +952,6 @@ function run_sandbox(state::AppState)
         end
     else
         println("\n🐚 Starting $(BOLD)bash$(RESET) shell...")
-        println("\n📦 Available tools:")
-        println("   $(BOLD)node$(RESET)  - Node.js v22")
-        println("   $(BOLD)npm$(RESET)   - Node Package Manager")
-        println("   $(BOLD)git$(RESET)   - Git version control")
-        println("   $(BOLD)gh$(RESET)    - GitHub CLI")
-        println("   $(BOLD)make$(RESET)  - GNU Make build tool")
-        println("   $(BOLD)rg$(RESET)    - ripgrep (fast search)")
-        println("   $(BOLD)python3$(RESET) - Python interpreter")
-        println("   $(BOLD)julia$(RESET) - Julia (nightly) via juliaup")
-        println("   $(BOLD)less$(RESET)  - File viewer/pager")
-        println("   $(BOLD)ps$(RESET)    - Process utilities (procps)")
-        println("   $(BOLD)clang$(RESET) - C/C++ compiler")
-        println("   $(BOLD)ar/nm/objdump$(RESET) - Binutils (archiver, symbols, disassembler)")
         if state.use_gemini
             println("\n💡 To install gemini:")
             println("   $(BOLD)npm install -g @google/gemini-cli$(RESET)")
