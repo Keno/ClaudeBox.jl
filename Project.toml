@@ -31,7 +31,7 @@ ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 [sources]
 GCC_crt_objects_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"}
 GCC_support_libraries_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"}
-Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}
+Sandbox = {rev = "main", url = "https://github.com/JuliaContainerization/Sandbox.jl"}
 
 [compat]
 GCC_support_libraries_jll = "14.2.0"
