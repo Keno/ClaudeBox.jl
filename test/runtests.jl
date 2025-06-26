@@ -46,6 +46,10 @@ using ClaudeBox.Sandbox
         # Test state creation with gemini flag
         state_gemini = ClaudeBox.initialize_state(pwd(), String[], false, false, true)
         @test state_gemini.use_gemini == true
+        
+        # Test gemini_home_dir is created
+        @test isdir(state.gemini_home_dir)
+        @test state.gemini_home_dir == joinpath(state.claude_prefix, "gemini_home")
     end
     
     @testset "Git Config in Sandbox" begin
@@ -86,6 +90,34 @@ using ClaudeBox.Sandbox
         mounts = config.mounts
         @test haskey(mounts, "/root/.gitconfig")
         @test mounts["/root/.gitconfig"].host_path == gitconfig_path
+    end
+    
+    @testset "Gemini Configuration Mounting" begin
+        # Create a test state
+        state = ClaudeBox.initialize_state(pwd())
+        ClaudeBox.setup_environment!(state)
+        
+        # Create sandbox config
+        config = ClaudeBox.create_sandbox_config(state)
+        
+        # Verify that gemini_home_dir mount is included
+        mounts = config.mounts
+        @test haskey(mounts, "/root/.gemini")
+        
+        # Check if external .gemini directory exists
+        external_gemini_dir = expanduser("~/.gemini")
+        if isdir(external_gemini_dir)
+            # The external directory should override the sandbox directory
+            @test mounts["/root/.gemini"].host_path == external_gemini_dir
+        else
+            # Otherwise, should use the sandbox gemini_home_dir
+            @test mounts["/root/.gemini"].host_path == state.gemini_home_dir
+        end
+        
+        # Verify environment variables for Gemini are included
+        env = config.env
+        @test haskey(env, "GOOGLE_API_KEY")
+        @test haskey(env, "GEMINI_API_KEY")
     end
     
     @testset "Build Tools Installation" begin

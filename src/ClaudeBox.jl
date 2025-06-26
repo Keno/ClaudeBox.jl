@@ -55,6 +55,7 @@ mutable struct AppState
     juliaup_dir::String
     julia_dir::String
     claude_home_dir::String
+    gemini_home_dir::String
     work_dir::String
     claude_installed::Bool
     gemini_installed::Bool
@@ -371,9 +372,10 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     juliaup_dir = joinpath(tools_prefix, "juliaup")
     julia_dir = joinpath(tools_prefix, "julia")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
+    gemini_home_dir = joinpath(claude_prefix, "gemini_home")
 
     # Ensure directories exist, otherwise the mount will fail
-    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir)
+    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir)
         mkpath(dir)
     end
 
@@ -387,7 +389,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
 end
 
 """
@@ -408,8 +410,8 @@ function build_cli_command(state::AppState, extra_args::Vector{String}=String[];
 
     # Build the command using Julia's command syntax
     if state.use_gemini
-        # Gemini doesn't use --dangerously-skip-permissions
-        return `$cli_executable $all_args`
+        # Always run gemini in yolo mode
+        return `$cli_executable --yolo $all_args`
     else
         # Claude needs the permissions flag
         return `$cli_executable --dangerously-skip-permissions $all_args`
@@ -820,6 +822,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
+        "/root/.gemini" => Sandbox.MountInfo(state.gemini_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite),
         "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite)
     )
@@ -839,6 +842,13 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         # Mount it to the corresponding location inside the sandbox
         mounts["/root/.claude/projects/$work_dir_name"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
         cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
+    end
+
+    # Map external .gemini directory if it exists (overrides the sandbox gemini directory)
+    external_gemini_dir = expanduser("~/.gemini")
+    if isdir(external_gemini_dir)
+        mounts["/root/.gemini"] = Sandbox.MountInfo(external_gemini_dir, Sandbox.MountType.ReadWrite)
+        cprintln(CYAN, "📁 Mounting external Gemini configuration: $external_gemini_dir")
     end
 
     # Add resolv.conf for DNS resolution if it exists
@@ -883,6 +893,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
             "npm_config_cache" => "/opt/npm/cache",
             "npm_config_userconfig" => "/opt/npm/.npmrc",
             "ANTHROPIC_API_KEY" => get(ENV, "ANTHROPIC_API_KEY", ""),
+            "GOOGLE_API_KEY" => get(ENV, "GOOGLE_API_KEY", ""),
+            "GEMINI_API_KEY" => get(ENV, "GEMINI_API_KEY", ""),
             "GITHUB_TOKEN" => state.github_token,
             "TERM" => get(ENV, "TERM", "xterm-256color"),
             "LANG" => "C.UTF-8",
