@@ -27,7 +27,7 @@ A Julia application that runs claude-code in an isolated sandbox environment usi
 
 ```julia
 using Pkg
-Pkg.Apps.add(url="<repository-url>")
+Pkg.Apps.add(url="https://github.com/Keno/ClaudeBox.jl")
 ```
 
 This will automatically install the `claudebox` executable to your Julia depot's bin directory.
@@ -36,7 +36,7 @@ This will automatically install the `claudebox` executable to your Julia depot's
 
 1. Clone this repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/Keno/ClaudeBox.jl
 cd ClaudeBox
 ```
 
