@@ -57,12 +57,14 @@ mutable struct AppState
     claude_home_dir::String
     work_dir::String
     claude_installed::Bool
+    gemini_installed::Bool
     github_token::String
     github_refresh_token::Union{String, Nothing}
     claude_args::Vector{String}
     keep_bash::Bool
     claude_sandbox_dir::Union{String, Nothing}
     dangerous_github_auth::Bool
+    use_gemini::Bool
 end
 
 """
@@ -131,7 +133,7 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
@@ -245,6 +247,7 @@ function parse_args(args::Vector{String})
         "no_github_auth" => false,
         "dangerous_github_auth" => false,
         "bash" => false,
+        "gemini" => false,
         "claude_args" => String[]
     )
 
@@ -265,6 +268,8 @@ function parse_args(args::Vector{String})
             options["dangerous_github_auth"] = true
         elseif arg == "--bash"
             options["bash"] = true
+        elseif arg == "--gemini"
+            options["gemini"] = true
         elseif arg in ["--work-dir", "-w"]
             if i < length(args)
                 i += 1
@@ -317,6 +322,7 @@ function print_help()
         --no-github-auth    Skip GitHub authentication (enabled by default)
         --dangerous-github-auth  Use GitHub auth with broader permissions (repo creation, etc)
         --bash              Keep bash shell open after claude exits
+        --gemini            Use gemini instead of claude
 
     Unrecognized flags are passed through to the claude command.
 
@@ -354,7 +360,7 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false)::AppState
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
 
@@ -371,14 +377,43 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
         mkpath(dir)
     end
 
-    # Check if claude is installed
+    # Check if claude and gemini are installed
     claude_bin = joinpath(npm_dir, "bin", "claude")
     claude_installed = isfile(claude_bin)
+
+    gemini_bin = joinpath(npm_dir, "bin", "gemini")
+    gemini_installed = isfile(gemini_bin)
 
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, juliaup_dir, julia_dir, claude_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
+end
+
+"""
+    build_cli_command(state::AppState, extra_args::Vector{String}=String[]; use_full_path::Bool=false)
+
+Build the CLI command based on the application state.
+Returns a Cmd object that can be executed directly.
+"""
+function build_cli_command(state::AppState, extra_args::Vector{String}=String[]; use_full_path::Bool=false)
+    # Determine which CLI to use
+    cli_name = state.use_gemini ? "gemini" : "claude"
+
+    # Build the executable path
+    cli_executable = use_full_path ? "/opt/npm/bin/$cli_name" : cli_name
+
+    # Combine all arguments
+    all_args = vcat(state.claude_args, extra_args)
+
+    # Build the command using Julia's command syntax
+    if state.use_gemini
+        # Gemini doesn't use --dangerously-skip-permissions
+        return `$cli_executable $all_args`
+    else
+        # Claude needs the permissions flag
+        return `$cli_executable --dangerously-skip-permissions $all_args`
+    end
 end
 
 
@@ -556,8 +591,8 @@ function are_all_build_tools_installed(state::AppState)
     lld_bin = joinpath(state.build_tools_dir, "tools", "lld")
     # CURL provides the curl command-line tool
     curl_bin = joinpath(state.build_tools_dir, "bin", "curl")
-    
-    return isfile(git_bin) && isfile(make_bin) && isfile(rg_bin) && 
+
+    return isfile(git_bin) && isfile(make_bin) && isfile(rg_bin) &&
            isfile(python_bin) && isfile(less_bin) && isfile(ps_bin) && isfile(clang_bin) &&
            isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin) && isfile(lld_bin) && isfile(curl_bin)
 end
@@ -632,23 +667,23 @@ function setup_environment!(state::AppState)
     # Install all build tools together to avoid file conflicts
     if !are_all_build_tools_installed(state)
         cprintln(YELLOW, "  Installing build tools...")
-        
+
         # Remove the entire build tools directory to ensure clean installation
         if isdir(state.build_tools_dir)
             rm(state.build_tools_dir; recursive=true, force=true)
         end
         mkpath(state.build_tools_dir)
-        
+
         # Collect all build tool artifacts together
-        build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll", 
+        build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll",
                            "Python_jll", "less_jll", "procps_jll", "Clang_jll", "Binutils_jll", "LLD_jll", "CURL_jll",
-                           "GCC_crt_objects_jll", "GCC_support_libraries_jll"]
+                           #= "GCC_crt_objects_jll", "GCC_support_libraries_jll" =#]
         artifact_paths = collect_artifact_paths(build_tools_jlls)
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
-        
+
         cprintln(GREEN, "  ✓ Build tools installed")
     end
-    
+
     # Create a credential helper script in build_tools (after build tools are installed)
     credential_helper_path = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
     mkpath(dirname(credential_helper_path))
@@ -674,21 +709,21 @@ esac
     if install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
         # juliaup was just installed, set up nightly as default and install General registry
         cprintln(YELLOW, "  Setting up Julia nightly and General registry...")
-        
+
         # Create sandbox config for Julia setup
         config = create_sandbox_config(state)
-        
+
         success = Sandbox.with_executor() do exe
             try
                 # First add nightly channel
                 run(exe, config, `/opt/juliaup/bin/juliaup add nightly`)
-                
+
                 # Then set it as default
                 run(exe, config, `/opt/juliaup/bin/juliaup default nightly`)
-                
+
                 # Install the General registry using nightly Julia
                 run(exe, config, `/opt/juliaup/bin/julia +nightly -e "using Pkg; Pkg.Registry.add(\"General\")"`)
-                
+
                 cprintln(GREEN, "  ✓ Julia nightly set as default and General registry installed")
                 return true
             catch e
@@ -706,42 +741,66 @@ esac
     # Check if claude is installed
     claude_bin = joinpath(state.npm_dir, "bin", "claude")
     state.claude_installed = isfile(claude_bin)
+    
+    # Check if gemini is installed
+    gemini_bin = joinpath(state.npm_dir, "bin", "gemini")
+    state.gemini_installed = isfile(gemini_bin)
 
-    if state.claude_installed
-        cprintln(GREEN, "✓ claude-code is already installed")
+    # Check and install both CLIs if needed
+    clis_to_install = Tuple{String, String, Bool}[]
+
+    if !state.claude_installed
+        push!(clis_to_install, ("claude-code", "@anthropic-ai/claude-code", true))
+    end
+
+    if !state.gemini_installed
+        push!(clis_to_install, ("gemini", "@google/gemini-cli", false))
+    end
+
+    if isempty(clis_to_install)
+        cprintln(GREEN, "✓ All CLIs are already installed")
     else
-        # Try to install claude-code automatically
-        println()
-        cprintln(YELLOW, "Installing claude-code...")
-
         # Create sandbox config for installation
         config = create_sandbox_config(state)
 
-        success = Sandbox.with_executor() do exe
-            try
-                # Configure npm to reduce output
-                run(exe, config, `/bin/sh -c "echo 'fund=false\naudit=false\nprogress=false' > /opt/npm/.npmrc"`)
+        for (cli_name, npm_package, needs_workaround) in clis_to_install
+            println()
+            cprintln(YELLOW, "Installing $cli_name...")
 
-                # Install claude-code with output
-                run(exe, config, `/opt/nodejs/bin/npm install -g @anthropic-ai/claude-code`)
+            success = Sandbox.with_executor() do exe
+                try
+                    # Configure npm to reduce output
+                    run(exe, config, `/bin/sh -c "echo 'fund=false\naudit=false\nprogress=false' > /opt/npm/.npmrc"`)
 
-                # Workaround for https://github.com/anthropics/claude-code/issues/927
-                # The UID check gives wrong values in sandboxed environments
-                cli_path = "/opt/npm/lib/node_modules/@anthropic-ai/claude-code/cli.js"
-                run(exe, config, `/bin/sh -c "sed -i 's/process\\.getuid()===0/false/g' $cli_path"`)
+                    # Install the CLI with output
+                    run(exe, config, `/opt/nodejs/bin/npm install -g $npm_package`)
 
-                cprintln(GREEN, "✓ claude-code installed successfully!")
-                return true
-            catch e
-                cprintln(RED, "✗ Failed to install claude-code automatically")
-                println("  Error: $e")
-                println("\n  You can try installing manually inside the sandbox:")
-                println("  $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
-                return false
+                    # Workaround for https://github.com/anthropics/claude-code/issues/927
+                    # The UID check gives wrong values in sandboxed environments
+                    # Only apply this for claude-code, not gemini
+                    if needs_workaround
+                        cli_path = "/opt/npm/lib/node_modules/@anthropic-ai/claude-code/cli.js"
+                        run(exe, config, `/bin/sh -c "sed -i 's/process\\.getuid()===0/false/g' $cli_path"`)
+                    end
+
+                    cprintln(GREEN, "✓ $cli_name installed successfully!")
+                    return true
+                catch e
+                    cprintln(RED, "✗ Failed to install $cli_name automatically")
+                    println("  Error: $e")
+                    println("\n  You can try installing manually inside the sandbox:")
+                    println("  $(BOLD)npm install -g $npm_package$(RESET)")
+                    return false
+                end
+            end
+
+            # Update the appropriate installation status
+            if cli_name == "claude-code"
+                state.claude_installed = success
+            else
+                state.gemini_installed = success
             end
         end
-
-        state.claude_installed = success
     end
 
     println()
@@ -749,7 +808,7 @@ end
 
 const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
 
-function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.SandboxConfig
+function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
     # Prepare mounts using MountInfo
     mounts = Dict{String, Sandbox.MountInfo}(
         "/" => Sandbox.MountInfo(Sandbox.debian_rootfs(), Sandbox.MountType.Overlayed),
@@ -774,7 +833,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
     # Convert work_dir path to claude projects directory name (replace / with -)
     work_dir_name = replace(state.work_dir, "/" => "-")
     external_claude_projects = expanduser("~/.claude/projects/$work_dir_name")
-    
+
     # Check if the external claude projects directory exists
     if isdir(external_claude_projects)
         # Mount it to the corresponding location inside the sandbox
@@ -833,7 +892,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull)::Sandbox.San
             "JULIA_DEPOT_PATH" => "/root/.julia",
             "GIT_SSL_CAPATH" => "/etc/ssl/certs",
             "CURL_CA_BUNDLE" => "/etc/ssl/certs/ca-certificates.crt"
-        ); stdin
+        ); stdin, stdout, stderr
     )
 end
 
@@ -849,10 +908,12 @@ function run_sandbox(state::AppState)
     println("📁 Workspace: $(BOLD)/workspace$(RESET) → $(state.work_dir)")
     println("🚪 Exit with: $(BOLD)exit$(RESET) or $(BOLD)Ctrl+D$(RESET)")
 
-    # Always use bash, but prepare to launch claude if appropriate
-    if state.claude_installed
-        println("\n🤖 Starting $(BOLD)claude$(RESET) interactive session...")
-        println("   Type your prompts and claude will respond")
+    # Always use bash, but prepare to launch claude/gemini if appropriate
+    cli_installed = state.use_gemini ? state.gemini_installed : state.claude_installed
+    if cli_installed
+        cli_name = state.use_gemini ? "gemini" : "claude"
+        println("\n🤖 Starting $(BOLD)$cli_name$(RESET) interactive session...")
+        println("   Type your prompts and $cli_name will respond")
         if state.keep_bash
             println("   Use $(BOLD)exit$(RESET) to return to bash shell")
         else
@@ -873,8 +934,13 @@ function run_sandbox(state::AppState)
         println("   $(BOLD)ps$(RESET)    - Process utilities (procps)")
         println("   $(BOLD)clang$(RESET) - C/C++ compiler")
         println("   $(BOLD)ar/nm/objdump$(RESET) - Binutils (archiver, symbols, disassembler)")
-        println("\n💡 To install claude-code:")
-        println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
+        if state.use_gemini
+            println("\n💡 To install gemini:")
+            println("   $(BOLD)npm install -g @google/gemini-cli$(RESET)")
+        else
+            println("\n💡 To install claude-code:")
+            println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
+        end
     end
 
     cmd = `/bin/bash --login`
@@ -968,34 +1034,39 @@ alias la='ls -A'
 alias l='ls -CF'
 """
 
-            # Add auto-launch for claude if installed
-            if state.claude_installed
-                # Prepare claude args as a shell-escaped string
-                claude_args_str = ""
-                if !isnothing(state.claude_args) && !isempty(state.claude_args)
-                    claude_args_str = " " * join(["\$(printf '%q' '$arg')" for arg in state.claude_args], " ")
-                end
+            # Add auto-launch for the selected CLI if installed
+            cli_installed = state.use_gemini ? state.gemini_installed : state.claude_installed
+            if cli_installed
+                # Use the command builder to create the command
+                cli_cmd = build_cli_command(state; use_full_path=false)
+
+                # Convert to shell string for bash
+                full_command = Base.shell_escape(cli_cmd)
+
+                # Get cli name and base command for display
+                cli_name = state.use_gemini ? "gemini" : "claude"
+                base_command = state.use_gemini ? cli_name : "$cli_name --dangerously-skip-permissions"
 
                 if state.keep_bash
                     bashrc_content *= """
 
-# Auto-launch claude
+# Auto-launch $cli_name
 if [ -z "\$CLAUDE_LAUNCHED" ]; then
     export CLAUDE_LAUNCHED=1
     cd /workspace
-    claude --dangerously-skip-permissions$claude_args_str
+    $full_command
     echo ""
-    echo "🐚 Returned to bash shell. Run 'claude --dangerously-skip-permissions' to start claude again."
+    echo "🐚 Returned to bash shell. Run '$base_command' to start $cli_name again."
 fi
 """
                 else
                     bashrc_content *= """
 
-# Auto-launch claude and exit
+# Auto-launch $cli_name and exit
 if [ -z "\$CLAUDE_LAUNCHED" ]; then
     export CLAUDE_LAUNCHED=1
     cd /workspace
-    claude --dangerously-skip-permissions$claude_args_str
+    $full_command
     exit
 fi
 """

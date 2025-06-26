@@ -35,17 +35,22 @@ When adding new JLL dependencies:
 3. Run `julia +nightly --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"`
 4. Add tests to verify the dependency is properly installed
 
-#### Finding Correct Package UUIDs
-If you need to find the correct UUID for a Julia package:
-1. First try installing it in a temporary environment:
-   ```bash
-   julia +nightly -e "using Pkg; pkg\"add PackageName_jll\""
-   ```
-2. Then check the Manifest.toml for the UUID:
-   ```bash
-   grep -A5 "\[\[deps.PackageName_jll\]\]" ~/.julia/environments/v1.13/Manifest.toml
-   ```
-3. Look for the `uuid = "..."` line in the output
-4. Use this exact UUID in your Project.toml
+#### Adding Dependencies
+**IMPORTANT**: Never manually edit UUIDs in Project.toml. Always use Pkg APIs to add dependencies:
 
-Note: Package UUIDs are unique identifiers and must match exactly what's in the registry.
+```bash
+# Add a regular dependency
+julia +nightly --project=. -e "using Pkg; Pkg.add(\"PackageName\")"
+
+# Add a test-only dependency
+julia +nightly --project=. -e "using Pkg; Pkg.add(\"PackageName\"; target=:test)"
+
+# Add from a specific source
+julia +nightly --project=. -e "using Pkg; Pkg.add(url=\"https://github.com/org/Package.jl\", rev=\"main\")"
+```
+
+This ensures:
+- Correct UUIDs are automatically resolved
+- Dependencies are properly registered in the manifest
+- Version compatibility is maintained
+- Test dependencies are correctly placed in [extras]

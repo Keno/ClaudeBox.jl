@@ -1,5 +1,6 @@
 using Test
 using ClaudeBox
+using ClaudeBox.Sandbox
 
 @testset "ClaudeBox Tests" begin
     @testset "Argument Parsing" begin
@@ -22,6 +23,14 @@ using ClaudeBox
         # Test default work directory
         options = ClaudeBox.parse_args(String[])
         @test options["work_dir"] == pwd()
+        
+        # Test gemini parsing
+        options = ClaudeBox.parse_args(String["--gemini"])
+        @test options["gemini"] == true
+        
+        # Test gemini default is false
+        options = ClaudeBox.parse_args(String[])
+        @test options["gemini"] == false
     end
     
     @testset "State Initialization" begin
@@ -32,6 +41,11 @@ using ClaudeBox
         @test isdir(state.claude_prefix)
         @test state.work_dir == pwd()
         @test state.claude_args == String[]
+        @test state.use_gemini == false
+        
+        # Test state creation with gemini flag
+        state_gemini = ClaudeBox.initialize_state(pwd(), String[], false, false, true)
+        @test state_gemini.use_gemini == true
     end
     
     @testset "Git Config in Sandbox" begin
@@ -108,6 +122,136 @@ using ClaudeBox
         # Verify other tools
         @test isfile(joinpath(state.nodejs_dir, "bin", "node"))
         @test isfile(joinpath(state.gh_cli_dir, "bin", "gh"))
+    end
+    
+    @testset "CLI Command Validation" begin
+        # This test validates that the CLI commands work correctly in the sandbox
+        # It tests running --help to ensure the commands are properly formed
+        
+        # First, ensure the CLIs are installed
+        state = ClaudeBox.initialize_state(pwd())
+        ClaudeBox.setup_environment!(state)
+        
+        # After setup, both CLIs should be installed
+        @test state.claude_installed == true
+        @test state.gemini_installed == true
+        
+        # Test 1: Claude with --help (use_gemini = false)
+        state_claude = ClaudeBox.initialize_state(pwd(), String[], false, false, false)
+        state_claude.claude_installed = true
+        state_claude.gemini_installed = true
+        
+        println("Testing claude command construction and execution...")
+        claude_cmd = ClaudeBox.build_cli_command(state_claude, ["--help"]; use_full_path=true)
+        println("  Command: $claude_cmd")
+        
+        # Capture output to verify the command works
+        output = IOBuffer()
+        config = ClaudeBox.create_sandbox_config(state_claude; stdout=output, stderr=output)
+        
+        claude_result = Sandbox.with_executor() do exe
+            try
+                run(exe, config, claude_cmd)
+                
+                # Check the output
+                output_str = String(take!(output))
+                @test !isempty(output_str)
+                @test occursin("claude", lowercase(output_str)) || occursin("help", lowercase(output_str))
+                
+                println("✓ Claude command executed successfully")
+                return true
+            catch e
+                println("✗ Claude command failed: $e")
+                return false
+            end
+        end
+        
+        @test claude_result == true
+        
+        # Test 2: Gemini with --help (use_gemini = true)
+        state_gemini = ClaudeBox.initialize_state(pwd(), String[], false, false, true)
+        state_gemini.claude_installed = true
+        state_gemini.gemini_installed = true
+        
+        println("\nTesting gemini command construction and execution...")
+        gemini_cmd = ClaudeBox.build_cli_command(state_gemini, ["--help"]; use_full_path=true)
+        println("  Command: $gemini_cmd")
+        
+        # Capture output to verify the command works
+        output = IOBuffer()
+        config = ClaudeBox.create_sandbox_config(state_gemini; stdout=output, stderr=output)
+        
+        gemini_result = Sandbox.with_executor() do exe
+            try
+                run(exe, config, gemini_cmd)
+                
+                # Check the output
+                output_str = String(take!(output))
+                @test !isempty(output_str)
+                @test occursin("gemini", lowercase(output_str)) || occursin("help", lowercase(output_str))
+                
+                println("✓ Gemini command executed successfully")
+                return true
+            catch e
+                println("✗ Gemini command failed: $e")
+                return false
+            end
+        end
+        
+        @test gemini_result == true
+        
+        # Test 3: Test with arguments passed through claude_args
+        state_with_args = ClaudeBox.initialize_state(pwd(), ["--version"], false, false, true)
+        state_with_args.claude_installed = true
+        state_with_args.gemini_installed = true
+        
+        println("\nTesting command with arguments from state...")
+        args_cmd = ClaudeBox.build_cli_command(state_with_args; use_full_path=true)
+        println("  Command: $args_cmd")
+        
+        # Capture output to verify the command works
+        output = IOBuffer()
+        config = ClaudeBox.create_sandbox_config(state_with_args; stdout=output, stderr=output)
+        
+        args_result = Sandbox.with_executor() do exe
+            try
+                run(exe, config, args_cmd)
+                
+                # Check the output
+                output_str = String(take!(output))
+                @test !isempty(output_str)
+                # Should show version info
+                @test occursin("version", lowercase(output_str)) || occursin("gemini", lowercase(output_str)) || occursin(r"\d+\.\d+\.\d+", output_str)
+                
+                println("✓ Command with args executed successfully")
+                return true
+            catch e
+                println("✗ Command with args failed: $e")
+                return false
+            end
+        end
+        
+        @test args_result == true
+        
+        # Test 4: Test our command construction logic
+        # Verify that we don't add --dangerously-skip-permissions to gemini
+        println("\nTesting command construction logic...")
+        
+        # Build commands and verify they have the right structure
+        claude_test_cmd = ClaudeBox.build_cli_command(state_claude; use_full_path=false)
+        gemini_test_cmd = ClaudeBox.build_cli_command(state_gemini; use_full_path=false)
+        
+        # Convert to strings to check content
+        claude_str = string(claude_test_cmd)
+        gemini_str = string(gemini_test_cmd)
+        
+        # Claude should have the flag
+        @test occursin("--dangerously-skip-permissions", claude_str)
+        
+        # Gemini should NOT have the flag
+        @test !occursin("--dangerously-skip-permissions", gemini_str)
+        
+        println("✓ Command construction logic is correct")
     end
 end
 
