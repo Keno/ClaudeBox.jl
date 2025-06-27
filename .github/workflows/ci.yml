@@ -36,9 +36,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
-          
-      - uses: julia-actions/cache@v2
-        
+                  
       - uses: julia-actions/julia-buildpkg@v1
         
       - uses: julia-actions/julia-runtest@v1
