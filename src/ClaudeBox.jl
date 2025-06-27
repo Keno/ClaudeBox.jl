@@ -867,12 +867,13 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     work_dir_name = replace(state.work_dir, "/" => "-")
     external_claude_projects = expanduser("~/.claude/projects/$work_dir_name")
 
-    # Check if the external claude projects directory exists
-    if isdir(external_claude_projects)
-        # Mount it to the corresponding location inside the sandbox
-        mounts["/root/.claude/projects/$work_dir_name"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
-        cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
+    if !isdir(external_claude_projects)
+        mkpath(external_claude_projects)
     end
+    mkpath(joinpath(state.claude_home_dir, "projects", "-workspace"))
+    # Mount it to the corresponding location inside the sandbox
+    mounts["/root/.claude/projects/-workspace"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
+    cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
 
     # Map external .gemini directory if it exists (overrides the sandbox gemini directory)
     # Only mount when actually using Gemini
