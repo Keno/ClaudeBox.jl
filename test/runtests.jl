@@ -125,35 +125,23 @@ using ClaudeBox.Sandbox
         state = ClaudeBox.initialize_state(pwd())
         ClaudeBox.setup_environment!(state)
         
-        # Verify all build tools are installed using the same function as the main code
-        @test ClaudeBox.are_all_build_tools_installed(state) == true
-        
-        # Also verify individual tools to ensure the function is checking correctly
-        @test isfile(joinpath(state.build_tools_dir, "bin", "git"))
-        @test isfile(joinpath(state.build_tools_dir, "bin", "make"))
+        # Verify tools installed in build_tools_dir (only the ones actually installed by BB2 setup)
         @test isfile(joinpath(state.build_tools_dir, "bin", "rg"))
         @test isfile(joinpath(state.build_tools_dir, "bin", "python3"))
         @test isfile(joinpath(state.build_tools_dir, "bin", "less"))
         @test isfile(joinpath(state.build_tools_dir, "bin", "ps"))
-        @test isfile(joinpath(state.build_tools_dir, "tools", "clang"))
-        
-        # Verify binutils tools
-        @test isfile(joinpath(state.build_tools_dir, "bin", "ar"))
-        @test isfile(joinpath(state.build_tools_dir, "bin", "nm"))
-        @test isfile(joinpath(state.build_tools_dir, "bin", "objdump"))
-        @test isfile(joinpath(state.build_tools_dir, "bin", "objcopy"))
-        @test isfile(joinpath(state.build_tools_dir, "bin", "strip"))
-        @test isfile(joinpath(state.build_tools_dir, "bin", "readelf"))
-        
-        # Verify LLD (LLVM linker)
-        @test isfile(joinpath(state.build_tools_dir, "tools", "lld"))
-        
-        # Verify curl
         @test isfile(joinpath(state.build_tools_dir, "bin", "curl"))
         
         # Verify other tools
         @test isfile(joinpath(state.nodejs_dir, "bin", "node"))
         @test isfile(joinpath(state.gh_cli_dir, "bin", "gh"))
+        
+        # Verify BB2 toolchain directory exists and has content
+        @test isdir(state.toolchain_dir)
+        @test !isempty(readdir(state.toolchain_dir))
+        
+        # The toolchain provides Git, Make, GCC, Binutils, etc. through the BB2 toolchain
+        # These are mounted at runtime in /opt/bb2-* directories in the sandbox
     end
     
     @testset "CLI Command Validation" begin

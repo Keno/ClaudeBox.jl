@@ -4,6 +4,7 @@ using Sandbox
 using JLLPrefixes
 using BinaryBuilder2
 using BinaryBuilderToolchains
+using BinaryBuilderToolchains: HostToolsToolchain
 using Scratch
 using MozillaCACerts_jll
 using JSON
@@ -571,29 +572,16 @@ end
 Check if all required build tools are installed in the expected locations.
 """
 function are_all_build_tools_installed(state::AppState)
-    git_bin = joinpath(state.build_tools_dir, "bin", "git")
-    make_bin = joinpath(state.build_tools_dir, "bin", "make")
+    # With BB2, we only install these tools in build_tools_dir
+    # Git, Make, GCC, Binutils, Clang, LLD are provided by the BB2 toolchain
     rg_bin = joinpath(state.build_tools_dir, "bin", "rg")
     python_bin = joinpath(state.build_tools_dir, "bin", "python3")
     less_bin = joinpath(state.build_tools_dir, "bin", "less")
     ps_bin = joinpath(state.build_tools_dir, "bin", "ps")
-    clang_bin = joinpath(state.build_tools_dir, "tools", "clang")
-    # Binutils provides many tools, we'll check for a few key ones
-    ar_bin = joinpath(state.build_tools_dir, "bin", "ar")
-    nm_bin = joinpath(state.build_tools_dir, "bin", "nm")
-    objdump_bin = joinpath(state.build_tools_dir, "bin", "objdump")
-    ld_bin = joinpath(state.build_tools_dir, "bin", "ld")
-    # LLD provides the LLVM linker
-    lld_bin = joinpath(state.build_tools_dir, "tools", "lld")
-    # CURL provides the curl command-line tool
     curl_bin = joinpath(state.build_tools_dir, "bin", "curl")
-    # GCC provides the GNU compiler
-    gcc_bin = joinpath(state.build_tools_dir, "bin", "gcc")
 
-    return isfile(git_bin) && isfile(make_bin) && isfile(rg_bin) &&
-           isfile(python_bin) && isfile(less_bin) && isfile(ps_bin) && isfile(clang_bin) &&
-           isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin) && isfile(ld_bin) && isfile(lld_bin) && isfile(curl_bin) &&
-           isfile(gcc_bin)
+    return isfile(rg_bin) && isfile(python_bin) && isfile(less_bin) && 
+           isfile(ps_bin) && isfile(curl_bin)
 end
 
 function bb2_target_spec()
@@ -958,7 +946,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
             # onto eachother in the sandbox, without clobbering each directory on
             # the host side.
             host_path = joinpath(state.toolchain_dir, string(idx, "-", lstrip(prefix, '/')))
-            mounts[prefix] = MountInfo(host_path, MountType.Overlayed)
+            mounts[prefix] = Sandbox.MountInfo(host_path, Sandbox.MountType.Overlayed)
         end
     end
 
