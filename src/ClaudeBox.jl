@@ -735,12 +735,14 @@ esac
 
     # Check if juliaup is installed (separate from build tools)
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
-    if install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
+    needs_julia_setup = install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
+    
+    # Create sandbox config once for all initialization tasks
+    config = nothing
+    if needs_julia_setup
+        config = create_sandbox_config(state)
         # juliaup was just installed, set up nightly as default and install General registry
         cprintln(YELLOW, "  Setting up Julia nightly and General registry...")
-
-        # Create sandbox config for Julia setup
-        config = create_sandbox_config(state)
 
         success = Sandbox.with_executor() do exe
             try
@@ -789,8 +791,10 @@ esac
     if isempty(clis_to_install)
         cprintln(GREEN, "✓ All CLIs are already installed")
     else
-        # Create sandbox config for installation
-        config = create_sandbox_config(state)
+        # Create sandbox config if we haven't already
+        if isnothing(config)
+            config = create_sandbox_config(state)
+        end
 
         for (cli_name, npm_package, needs_workaround) in clis_to_install
             println()
@@ -867,12 +871,13 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     work_dir_name = replace(state.work_dir, "/" => "-")
     external_claude_projects = expanduser("~/.claude/projects/$work_dir_name")
 
-    # Check if the external claude projects directory exists
-    if isdir(external_claude_projects)
-        # Mount it to the corresponding location inside the sandbox
-        mounts["/root/.claude/projects/$work_dir_name"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
-        cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
+    if !isdir(external_claude_projects)
+        mkpath(external_claude_projects)
     end
+    mkpath(joinpath(state.claude_home_dir, "projects", "-workspace"))
+    # Mount it to the corresponding location inside the sandbox
+    mounts["/root/.claude/projects/-workspace"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
+    cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
 
     # Map external .gemini directory if it exists (overrides the sandbox gemini directory)
     # Only mount when actually using Gemini
@@ -995,7 +1000,7 @@ function run_sandbox(state::AppState)
 
     println()
 
-    interactive_config = create_sandbox_config(state; stdin=Base.stdin)
+    interactive_config = Sandbox.SandboxConfig(config; stdin=Base.stdin)
 
     # Run the sandbox
     Sandbox.with_executor() do exe
