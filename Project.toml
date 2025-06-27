@@ -1,7 +1,7 @@
 name = "ClaudeBox"
 uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
-version = "1.1.0"
 authors = ["Claude Assistant"]
+version = "1.1.0"
 
 [deps]
 Binutils_jll = "489e263e-5428-50b0-a723-147a141b401e"
@@ -28,13 +28,21 @@ less_jll = "80e8a3d7-96cb-5b92-b346-c3bbc7c9cf8e"
 procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
 ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
-[sources]
-GCC_crt_objects_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"}
-GCC_support_libraries_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"}
-Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl#main"}
+[sources.GCC_crt_objects_jll]
+rev = "main"
+url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"
+
+[sources.GCC_support_libraries_jll]
+rev = "main"
+url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"
+
+[sources.Sandbox]
+rev = "main"
+url = "https://github.com/staticfloat/Sandbox.jl#main"
 
 [compat]
 GCC_support_libraries_jll = "14.2.0"
+HTTP = "1"
 JLLPrefixes = "0.3"
 NodeJS_22_jll = "22"
 REPL = "1.10"
