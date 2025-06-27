@@ -6,7 +6,6 @@ using BinaryBuilder2
 using BinaryBuilderToolchains
 using BinaryBuilderToolchains: HostToolsToolchain
 using Scratch
-using MozillaCACerts_jll
 using JSON
 using HTTP
 using REPL.Terminals: raw!, TTYTerminal
@@ -342,6 +341,7 @@ function print_help()
         less is available at: /opt/build_tools/bin/less
         procps is available at: /opt/build_tools/bin/ps
         curl is available at: /opt/build_tools/bin/curl
+        jq is available at: /opt/build_tools/bin/jq
         juliaup is available at: /opt/juliaup/bin/juliaup
         BB2 Toolchain (GCC, Binutils, etc.) is available at: /opt/bb-*
         Claude-code is automatically installed on first run
@@ -579,9 +579,10 @@ function are_all_build_tools_installed(state::AppState)
     less_bin = joinpath(state.build_tools_dir, "bin", "less")
     ps_bin = joinpath(state.build_tools_dir, "bin", "ps")
     curl_bin = joinpath(state.build_tools_dir, "bin", "curl")
+    jq_bin = joinpath(state.build_tools_dir, "bin", "jq")
 
-    return isfile(rg_bin) && isfile(python_bin) && isfile(less_bin) && 
-           isfile(ps_bin) && isfile(curl_bin)
+    return isfile(rg_bin) && isfile(python_bin) && isfile(less_bin) &&
+           isfile(ps_bin) && isfile(curl_bin) && isfile(jq_bin)
 end
 
 function bb2_target_spec()
@@ -677,7 +678,7 @@ function setup_environment!(state::AppState)
         mkpath(state.build_tools_dir)
 
         # Collect build tool artifacts (excluding toolchain components)
-        build_tools_jlls = ["ripgrep_jll", "Python_jll", "less_jll", "procps_jll", "CURL_jll"]
+        build_tools_jlls = ["ripgrep_jll", "Python_jll", "less_jll", "procps_jll", "CURL_jll", "jq_jll"]
 
         # Collect all build tool artifacts together
         platform = Base.BinaryPlatforms.HostPlatform()
@@ -874,10 +875,13 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     end
 
     # Map external .gemini directory if it exists (overrides the sandbox gemini directory)
-    external_gemini_dir = expanduser("~/.gemini")
-    if isdir(external_gemini_dir)
-        mounts["/root/.gemini"] = Sandbox.MountInfo(external_gemini_dir, Sandbox.MountType.ReadWrite)
-        cprintln(CYAN, "📁 Mounting external Gemini configuration: $external_gemini_dir")
+    # Only mount when actually using Gemini
+    if state.use_gemini
+        external_gemini_dir = expanduser("~/.gemini")
+        if isdir(external_gemini_dir)
+            mounts["/root/.gemini"] = Sandbox.MountInfo(external_gemini_dir, Sandbox.MountType.ReadWrite)
+            cprintln(CYAN, "📁 Mounting external Gemini configuration: $external_gemini_dir")
+        end
     end
 
     # Add resolv.conf for DNS resolution if it exists
@@ -891,23 +895,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         end
     end
 
-    # Add CA certificates for HTTPS connections
-    cacert_file = MozillaCACerts_jll.cacert
-    if isfile(cacert_file)
-        # Copy the certificate to scratch space
-        ssl_certs_dir = joinpath(state.tools_prefix, "ssl_certs")
-        mkpath(ssl_certs_dir)
-        cacert_copy = joinpath(ssl_certs_dir, "ca-certificates.crt")
-        cp(cacert_file, cacert_copy; force=true)
-
-        # Also create a ca-bundle.crt symlink (some tools look for this)
-        ca_bundle_link = joinpath(ssl_certs_dir, "ca-bundle.crt")
-        rm(ca_bundle_link; force=true)
-        symlink("ca-certificates.crt", ca_bundle_link)
-
-        # Mount the directory
-        mounts["/etc/ssl/certs"] = Sandbox.MountInfo(ssl_certs_dir, Sandbox.MountType.ReadOnly)
-    end
+    # CA certificates are now provided by BB2 toolchain at /opt/bb2-tools/etc/certs/
+    # No need to mount additional certificates since BB2 provides them
 
     # Create environment following BB2 pattern
     env = Dict{String,String}(

@@ -32,11 +32,11 @@ function request_device_code(client_id::String=DEFAULT_CLIENT_ID)
         ["Accept" => "application/json"],
         "client_id=$(client_id)&scope=repo"
     )
-    
+
     if response.status != 200
         error("Failed to request device code: $(response.status)")
     end
-    
+
     data = JSON.parse(String(response.body))
     return DeviceCodeResponse(
         data["device_code"],
@@ -54,9 +54,9 @@ function poll_for_token(device_code::String, interval::Int, client_id::String=DE
             ["Accept" => "application/json"],
             "client_id=$(client_id)&device_code=$(device_code)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
         )
-        
+
         data = JSON.parse(String(response.body))
-        
+
         if haskey(data, "access_token")
             return AccessTokenResponse(
                 data["access_token"],
@@ -83,16 +83,16 @@ end
 function authenticate(; dangerous_mode::Bool=false)
     client_id = dangerous_mode ? DANGEROUS_CLIENT_ID : DEFAULT_CLIENT_ID
     device_response = request_device_code(client_id)
-    
+
     println("\nPlease visit: $(device_response.verification_uri)")
     println("And enter code: $(device_response.user_code)")
     if dangerous_mode
         println("\n⚠️  Using DANGEROUS mode with broader permissions!")
     end
     println("\nWaiting for authorization (press Ctrl+C to skip)...")
-    
+
     token_response = poll_for_token(device_response.device_code, device_response.interval, client_id)
-    
+
     println("\nAuthentication successful!")
     return token_response
 end
@@ -104,7 +104,7 @@ function validate_token(token::String; silent::Bool=false)
             "https://api.github.com/user",
             ["Authorization" => "Bearer $token", "Accept" => "application/vnd.github.v3+json"]
         )
-        
+
         if response.status == 200
             user_data = JSON.parse(String(response.body))
             if !silent
@@ -128,7 +128,7 @@ function get_user_info(token::String)
             "https://api.github.com/user",
             ["Authorization" => "Bearer $token", "Accept" => "application/vnd.github.v3+json"]
         )
-        
+
         if response.status == 200
             user_data = JSON.parse(String(response.body))
             return (
@@ -151,7 +151,7 @@ function refresh_access_token(refresh_token::String; dangerous_mode::Bool=false)
             ["Accept" => "application/json"],
             "client_id=$(client_id)&refresh_token=$(refresh_token)&grant_type=refresh_token"
         )
-        
+
         if response.status == 200
             data = JSON.parse(String(response.body))
             if haskey(data, "access_token")
@@ -178,20 +178,20 @@ function check_claude_sandbox_repo(token::String)
             "https://api.github.com/user",
             ["Authorization" => "Bearer $token", "Accept" => "application/vnd.github.v3+json"]
         )
-        
+
         if user_response.status != 200
             return nothing
         end
-        
+
         user_data = JSON.parse(String(user_response.body))
         username = user_data["login"]
-        
+
         # Check if .claude_sandbox repo exists
         repo_response = HTTP.get(
             "https://api.github.com/repos/$username/.claude_sandbox",
             ["Authorization" => "Bearer $token", "Accept" => "application/vnd.github.v3+json"]
         )
-        
+
         if repo_response.status == 200
             repo_data = JSON.parse(String(repo_response.body))
             return (
