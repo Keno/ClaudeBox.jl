@@ -16,10 +16,11 @@ If you accidentally stage or commit `Manifest.toml`:
 When asked to "ship it":
 1. Stage all changes: `git add -A`
 2. Create a descriptive commit message
-3. Push to the repository: `git push origin <branch>`
-4. **IMPORTANT**: Monitor the GitHub Actions CI run to ensure it passes
+3. Run tests locally and make sure they pass (if not, fix them and amend the commit)
+4. Push to the repository: `git push origin <branch>`
+5. **IMPORTANT**: Monitor the GitHub Actions CI run to ensure it passes
    - Use: `gh run list --branch <branch> --limit 1` to find the run
-   - Use: `gh run watch <run-id> --exit-status` to monitor it
+   - Use: `gh run watch <run-id> --exit-status` to monitor it. **IMPORTANT**: Increase the timeout for this step. It can take up to 10 minutes.
    - If it fails, investigate and fix before considering the task complete
 
 ### Testing
