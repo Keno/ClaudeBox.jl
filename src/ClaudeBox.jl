@@ -2,6 +2,8 @@ module ClaudeBox
 
 using Sandbox
 using JLLPrefixes
+using BinaryBuilder2
+using BinaryBuilderToolchains
 using Scratch
 using MozillaCACerts_jll
 using JSON
@@ -37,7 +39,7 @@ mutable struct AppState
     npm_dir::String
     gh_cli_dir::String
     build_tools_dir::String
-    sysroot_dir::String
+    toolchain_dir::String
     juliaup_dir::String
     julia_dir::String
     claude_home_dir::String
@@ -338,11 +340,9 @@ function print_help()
         Python is available at: /opt/build_tools/bin/python3
         less is available at: /opt/build_tools/bin/less
         procps is available at: /opt/build_tools/bin/ps
-        Clang is available at: /opt/build_tools/tools/clang
-        Binutils is available at: /opt/build_tools/bin/ar, nm, objdump, etc.
-        LLD (LLVM Linker) is available at: /opt/build_tools/tools/lld
         curl is available at: /opt/build_tools/bin/curl
         juliaup is available at: /opt/juliaup/bin/juliaup
+        BB2 Toolchain (GCC, Binutils, etc.) is available at: /opt/bb-*
         Claude-code is automatically installed on first run
     """)
 end
@@ -355,14 +355,14 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     npm_dir = joinpath(tools_prefix, "npm")
     gh_cli_dir = joinpath(tools_prefix, "gh_cli")
     build_tools_dir = joinpath(tools_prefix, "build_tools")
-    sysroot_dir = joinpath(tools_prefix, "sysroot")
+    toolchain_dir = joinpath(tools_prefix, "toolchain")
     juliaup_dir = joinpath(tools_prefix, "juliaup")
     julia_dir = joinpath(tools_prefix, "julia")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
     gemini_home_dir = joinpath(claude_prefix, "gemini_home")
 
     # Ensure directories exist, otherwise the mount will fail
-    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, sysroot_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir)
+    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir)
         mkpath(dir)
     end
 
@@ -376,7 +376,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, sysroot_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
+    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
 end
 
 """
@@ -549,8 +549,9 @@ function install_jll_tool(tool_name::String, jll_name::String, bin_path::String,
         platform = Base.BinaryPlatforms.HostPlatform()
         platform["target_libc"] = "glibc"
         platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
+        delete!(platform.tags, "julia_version")
 
-        artifact_paths = collect_artifact_paths([jll_name]; from_current_manifest=true, platform=platform)
+        artifact_paths = collect_artifact_paths([jll_name]; platform=platform)
         deploy_artifact_paths(install_dir, artifact_paths)
 
         # Run post-install hook if provided
@@ -593,6 +594,21 @@ function are_all_build_tools_installed(state::AppState)
            isfile(python_bin) && isfile(less_bin) && isfile(ps_bin) && isfile(clang_bin) &&
            isfile(ar_bin) && isfile(nm_bin) && isfile(objdump_bin) && isfile(ld_bin) && isfile(lld_bin) && isfile(curl_bin) &&
            isfile(gcc_bin)
+end
+
+function bb2_target_spec()
+    # Create a basic build environment using BB2 approach
+    host_platform = BinaryBuilderToolchains.BBHostPlatform()
+    platform = BinaryBuilderToolchains.CrossPlatform(host_platform, host_platform)
+
+    # Create BuildTargetSpec for the host
+    return BinaryBuilder2.BuildTargetSpec(
+        "bb2",
+        platform,
+        [BinaryBuilderToolchains.CToolchain(;lock_microarchitecture=false), HostToolsToolchain(platform)],  # Use default CToolchain
+        [],  # No additional dependencies
+        Set([:host, :default])
+    )
 end
 
 function setup_environment!(state::AppState)
@@ -638,7 +654,7 @@ function setup_environment!(state::AppState)
 
         write(gitconfig_path, """
 [http]
-    sslCAInfo = /etc/ssl/certs/ca-certificates.crt
+    sslCAInfo = /opt/bb2-tools/etc/certs/ca-certificates.crt
 [user]
     name = $user_name
     email = $user_email
@@ -672,36 +688,40 @@ function setup_environment!(state::AppState)
         end
         mkpath(state.build_tools_dir)
 
-        # Collect build tool artifacts (excluding Glibc and GCC)
-        build_tools_jlls = ["Git_jll", "GNUMake_jll", "ripgrep_jll",
-                           "Python_jll", "less_jll", "procps_jll", "Clang_jll", "LLD_jll", "CURL_jll",
-                           "GCC_crt_objects_jll", "GCC_support_libraries_jll"]
+        # Collect build tool artifacts (excluding toolchain components)
+        build_tools_jlls = ["ripgrep_jll", "Python_jll", "less_jll", "procps_jll", "CURL_jll"]
 
-        # Create platform with glibc target and host arch
+        # Collect all build tool artifacts together
         platform = Base.BinaryPlatforms.HostPlatform()
-        platform["target_libc"] = "glibc"
-        platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
-
-        artifact_paths = collect_artifact_paths(build_tools_jlls; from_current_manifest=true, platform=platform)
+        delete!(platform.tags, "julia_version")
+        artifact_paths = collect_artifact_paths(build_tools_jlls; platform)
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
 
         cprintln(GREEN, "  ✓ Build tools installed")
     end
 
-    # Install sysroot components (Glibc and GCC)
-    sysroot_jlls = ["Glibc_jll", "GCC_jll", "Binutils_jll"]
-    if !isdir(joinpath(state.sysroot_dir, "lib"))
-        cprintln(YELLOW, "  Installing sysroot...")
+    # Set up BinaryBuilder2 toolchain
+    if isempty(readdir(joinpath(state.toolchain_dir)))
+        cprintln(YELLOW, "  Setting up BB2 toolchain...")
 
-        # Create platform with glibc target and host arch
-        platform = Base.BinaryPlatforms.HostPlatform()
-        platform["target_libc"] = "glibc"
-        platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
+        target_spec = bb2_target_spec()
 
-        artifact_paths = collect_artifact_paths(sysroot_jlls; from_current_manifest=true, platform=platform)
-        deploy_artifact_paths(state.sysroot_dir, artifact_paths)
+        # Apply toolchains to get sources and environment
+        env = Dict{String,String}()
+        source_trees = Dict{String,Vector{BinaryBuilder2.BinaryBuilderSources.AbstractSource}}()
+        env, source_trees = BinaryBuilder2.apply_toolchains(target_spec, env, source_trees)
 
-        cprintln(GREEN, "  ✓ Sysroot installed")
+        # Deploy toolchain sources
+        for (idx, (prefix, sources)) in enumerate(source_trees)
+            if startswith(prefix, "/opt/")
+                deploy_path = joinpath(state.toolchain_dir, string(idx, "-", lstrip(prefix, '/')))
+
+                BinaryBuilder2.BinaryBuilderSources.prepare(sources)
+                BinaryBuilder2.BinaryBuilderSources.deploy(sources, deploy_path)
+            end
+        end
+
+        cprintln(GREEN, "  ✓ BB2 toolchain installed")
     end
 
     # Create a credential helper script in build_tools (after build tools are installed)
@@ -826,17 +846,19 @@ esac
     println()
 end
 
-const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/juliaup/bin:/usr/bin:/bin:/usr/local/bin"
+const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
-    # Prepare mounts using MountInfo
+    # Get host platform for debian rootfs
+    host_platform = Base.BinaryPlatforms.HostPlatform()
+
+    # Prepare mounts using MountInfo, following BinaryBuilder2 pattern
     mounts = Dict{String, Sandbox.MountInfo}(
-        "/" => Sandbox.MountInfo(Sandbox.debian_rootfs(), Sandbox.MountType.Overlayed),
+        "/" => Sandbox.MountInfo(Sandbox.debian_rootfs(; platform=host_platform), Sandbox.MountType.Overlayed),
         "/opt/nodejs" => Sandbox.MountInfo(state.nodejs_dir, Sandbox.MountType.ReadOnly),
         "/opt/npm" => Sandbox.MountInfo(state.npm_dir, Sandbox.MountType.ReadWrite),
         "/opt/gh_cli" => Sandbox.MountInfo(state.gh_cli_dir, Sandbox.MountType.ReadOnly),
         "/opt/build_tools" => Sandbox.MountInfo(state.build_tools_dir, Sandbox.MountType.ReadOnly),
-        "/opt/sysroot" => Sandbox.MountInfo(state.sysroot_dir, Sandbox.MountType.ReadOnly),
         "/opt/juliaup" => Sandbox.MountInfo(state.juliaup_dir, Sandbox.MountType.ReadOnly),
         "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
@@ -899,31 +921,62 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         mounts["/etc/ssl/certs"] = Sandbox.MountInfo(ssl_certs_dir, Sandbox.MountType.ReadOnly)
     end
 
+    # Create environment following BB2 pattern
+    env = Dict{String,String}(
+        "HOME" => "/root",
+        "PATH" => SANDBOX_PATH,
+        "NODE_PATH" => "/opt/npm/lib/node_modules",
+        "npm_config_prefix" => "/opt/npm",
+        "npm_config_cache" => "/opt/npm/cache",
+        "npm_config_userconfig" => "/opt/npm/.npmrc",
+        "ANTHROPIC_API_KEY" => get(ENV, "ANTHROPIC_API_KEY", ""),
+        "GOOGLE_API_KEY" => get(ENV, "GOOGLE_API_KEY", ""),
+        "GEMINI_API_KEY" => get(ENV, "GEMINI_API_KEY", ""),
+        "GITHUB_TOKEN" => state.github_token,
+        "TERM" => get(ENV, "TERM", "xterm-256color"),
+        "TERMINFO" => "/lib/terminfo",
+        "LANG" => "C.UTF-8",
+        "USER" => "root",
+        "WORKSPACE" => "/workspace",
+        "JULIA_DEPOT_PATH" => "/root/.julia",
+    )
+
+    # Add toolchain environment variables if toolchain is installed
+    if !isempty(readdir(state.toolchain_dir))
+        # Get toolchain environment from BB2
+        # Create the same target spec to get consistent environment
+        target_spec = bb2_target_spec()
+
+        # Get toolchain environment
+        toolchain_env = Dict{String,String}()
+        source_trees = Dict{String,Vector{BinaryBuilder2.BinaryBuilderSources.AbstractSource}}()
+        env, source_trees = BinaryBuilder2.apply_toolchains(target_spec, env, source_trees)
+
+        for (idx, (prefix, srcs)) in enumerate(source_trees)
+            # Strip leading slashes so that `joinpath()` works as expected,
+            # prefix with `idx` so that we can overlay multiple disparate folders
+            # onto eachother in the sandbox, without clobbering each directory on
+            # the host side.
+            host_path = joinpath(state.toolchain_dir, string(idx, "-", lstrip(prefix, '/')))
+            mounts[prefix] = MountInfo(host_path, MountType.Overlayed)
+        end
+    end
+
+    # https://github.com/JuliaLang/NetworkOptions.jl/issues/41
+    env["JULIA_SSL_CA_ROOTS_PATH"] = env["SSL_CERT_FILE"]
+
+    # Create SandboxConfig following BB2 pattern
     Sandbox.SandboxConfig(
-        # Mounts
         mounts,
-        # Environment
-        Dict(
-            "HOME" => "/root",
-            # Note: We need to set PATH both here and in bashrc, because bash overrides it on login
-            "PATH" => SANDBOX_PATH,
-            "NODE_PATH" => "/opt/npm/lib/node_modules",
-            "npm_config_prefix" => "/opt/npm",
-            "npm_config_cache" => "/opt/npm/cache",
-            "npm_config_userconfig" => "/opt/npm/.npmrc",
-            "ANTHROPIC_API_KEY" => get(ENV, "ANTHROPIC_API_KEY", ""),
-            "GOOGLE_API_KEY" => get(ENV, "GOOGLE_API_KEY", ""),
-            "GEMINI_API_KEY" => get(ENV, "GEMINI_API_KEY", ""),
-            "GITHUB_TOKEN" => state.github_token,
-            "TERM" => get(ENV, "TERM", "xterm-256color"),
-            "LANG" => "C.UTF-8",
-            "USER" => "root",
-            "SSL_CERT_FILE" => "/etc/ssl/certs/ca-certificates.crt",
-            "GIT_SSL_CAINFO" => "/etc/ssl/certs/ca-certificates.crt",
-            "JULIA_DEPOT_PATH" => "/root/.julia",
-            "GIT_SSL_CAPATH" => "/etc/ssl/certs",
-            "CURL_CA_BUNDLE" => "/etc/ssl/certs/ca-certificates.crt"
-        ); stdin, stdout, stderr
+        env;
+        hostname = "claudebox",
+        persist = true,
+        pwd = "/workspace",
+        stdin = stdin,
+        stdout = stdout,
+        stderr = stderr,
+        verbose = false,
+        multiarch = [host_platform]
     )
 end
 
@@ -1002,6 +1055,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
   - Julia (nightly) via juliaup for Julia development
   - less for file viewing and pagination
   - procps utilities (ps, pgrep, top, etc.) for process management
+  - BinaryBuilder2 Toolchain (GCC, Binutils, Glibc, etc.) for compiling C/C++ code
   - Standard Unix tools
 
 ## Important Notes
@@ -1066,28 +1120,9 @@ alias l='ls -CF'
                 base_command = state.use_gemini ? cli_name : "$cli_name --dangerously-skip-permissions"
 
                 if state.keep_bash
-                    bashrc_content *= """
-
-# Auto-launch $cli_name
-if [ -z "\$CLAUDE_LAUNCHED" ]; then
-    export CLAUDE_LAUNCHED=1
-    cd /workspace
-    $full_command
-    echo ""
-    echo "🐚 Returned to bash shell. Run '$base_command' to start $cli_name again."
-fi
-"""
+                    cmd = `$cmd -c "$full_command; echo \"🐚 Returned to bash shell. Run '$base_command' to start $cli_name again.\"; exec /bin/bash --login"`
                 else
-                    bashrc_content *= """
-
-# Auto-launch $cli_name and exit
-if [ -z "\$CLAUDE_LAUNCHED" ]; then
-    export CLAUDE_LAUNCHED=1
-    cd /workspace
-    $full_command
-    exit
-fi
-"""
+                    cmd = `$cmd -c $full_command`
                 end
             end
 
@@ -1095,6 +1130,10 @@ fi
 $bashrc_content
 EOF"`)
         end
+        # Upgrade libstd++/libatomic
+        # NOTE: Be careful - if this goes into bashrc, claude may rerun it while node.js is running. cp overrides the file in-place, so if this is done while
+        # node is running, it'll fail with SIGBUS.
+        run(exe, config, `/bin/sh -c "cp /opt/bb2-x86_64-linux-gnu/gcc/x86_64-linux-gnu/lib64/libstdc++.so.6 /lib/x86_64-linux-gnu/; cp /opt/bb2-x86_64-linux-gnu/gcc/x86_64-linux-gnu/lib64/libatomic.so.1 /lib/x86_64-linux-gnu/"`)
 
         run(exe, interactive_config, cmd)
     end
