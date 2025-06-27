@@ -32,7 +32,6 @@ MozillaCACerts_jll = "14a3606d-f60d-562e-9121-12d972cd8159"
 MultiHashParsing = "73786568-6863-756d-6873-6168796e616d"
 NodeJS_22_jll = "8fca9ca2-e7a1-5ccf-8c05-43be5a78664f"
 OutputCollectors = "6c11c7d4-943b-4e2b-80de-f2cfc2930a8c"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Python_jll = "93d3a430-8e7c-50da-8e8d-3dfcfb3baf05"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 Sandbox = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
@@ -63,7 +62,6 @@ KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.j
 LinuxKernelHeaders_jll = {rev = "main", url = "https://github.com/staticfloat/LinuxKernelHeaders_jll.jl"}
 MultiHashParsing = {rev = "main", subdir = "MultiHashParsing.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 OutputCollectors = {rev = "master", url = "https://github.com/JuliaPackaging/OutputCollectors.jl"}
-Pkg = {path = "/home/keno/.julia/dev/Pkg"}
 Sandbox = {rev = "main", url = "https://github.com/staticfloat/Sandbox.jl"}
 TreeArchival = {rev = "main", subdir = "TreeArchival.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
 libstdcxx_jll = {rev = "main", url = "https://github.com/staticfloat/libstdcxx_jll.jl"}
