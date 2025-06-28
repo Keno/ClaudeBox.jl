@@ -62,7 +62,7 @@ KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.j
 LinuxKernelHeaders_jll = {rev = "main", url = "https://github.com/staticfloat/LinuxKernelHeaders_jll.jl"}
 MultiHashParsing = {rev = "main", subdir = "MultiHashParsing.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 OutputCollectors = {rev = "master", url = "https://github.com/JuliaPackaging/OutputCollectors.jl"}
-Sandbox = {rev = "combined-sandboxconfig-fixes", url = "https://github.com/KenoAIStaging/Sandbox.jl"}
+Sandbox = {rev = "main", url = "https://github.com/JuliaContainerization/Sandbox.jl"}
 TreeArchival = {rev = "main", subdir = "TreeArchival.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
 libstdcxx_jll = {rev = "main", url = "https://github.com/staticfloat/libstdcxx_jll.jl"}
 
@@ -81,7 +81,7 @@ MultiHashParsing = "0.1.0"
 OutputCollectors = "1.0.0"
 Python_jll = "3.10.14"
 REPL = "1.10"
-Sandbox = "2.1"
+Sandbox = "2.1.1"
 Scratch = "1.2"
 TreeArchival = "0.1.0"
 jq_jll = "1.7.1"
