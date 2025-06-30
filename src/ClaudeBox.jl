@@ -736,7 +736,7 @@ esac
     # Check if juliaup is installed (separate from build tools)
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
     needs_julia_setup = install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
-    
+
     # Create sandbox config once for all initialization tasks
     config = nothing
     if needs_julia_setup
@@ -1062,12 +1062,6 @@ end)$claude_sandbox_section
 - Use the workspace directory for all file operations
 - Git commits will use the configured user name and email
 - The sandbox provides a consistent, clean environment
-
-## Development Notes
-
-- After adding new dependencies to Project.toml, always run `julia +nightly --project=. -e "using Pkg; Pkg.resolve(); Pkg.instantiate()"` to resolve and install them
-- Always use Julia nightly (`+nightly`) when resolving dependencies to ensure compatibility
-- This ensures all JLL packages and dependencies are properly resolved and installed
 """
 
         run(exe, config, `/bin/sh -c "mkdir /etc/claude-code && cat > /etc/claude-code/CLAUDE.md << 'EOF'
