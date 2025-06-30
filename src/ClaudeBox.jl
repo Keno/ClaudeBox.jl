@@ -736,7 +736,7 @@ esac
     # Check if juliaup is installed (separate from build tools)
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
     needs_julia_setup = install_jll_tool("juliaup", "juliaup_jll", juliaup_bin, state.juliaup_dir)
-    
+
     # Create sandbox config once for all initialization tasks
     config = nothing
     if needs_julia_setup
@@ -962,6 +962,50 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     )
 end
 
+
+function collect_claude_md_sources(state::AppState)
+    sources = String[]
+
+    # Check for system-wide CLAUDE.md (common locations)
+    system_locations = [
+        joinpath(homedir(), ".claude", "CLAUDE.md"),
+        joinpath(homedir(), "CLAUDE.md"),
+        joinpath(homedir(), ".config", "claude", "CLAUDE.md"),
+        "/etc/claude/CLAUDE.md"
+    ]
+
+    for location in system_locations
+        if isfile(location)
+            content = try
+                read(location, String)
+            catch
+                ""
+            end
+            if !isempty(strip(content))
+                push!(sources, content)
+            end
+        end
+    end
+
+    return sources
+end
+
+
+function merge_claude_md_sources(sources::Vector{String})
+    isempty(sources) && return ""
+
+    buffer = IOBuffer()
+
+    for (i, content) in enumerate(sources)
+        if i > 1
+            print(buffer, "\n\n")
+        end
+        print(buffer, content)
+    end
+
+    return String(take!(buffer))
+end
+
 function run_sandbox(state::AppState)
     config = create_sandbox_config(state)
 
@@ -1004,6 +1048,9 @@ function run_sandbox(state::AppState)
 
     # Run the sandbox
     Sandbox.with_executor() do exe
+        # Collect all CLAUDE.md sources
+        claude_md_sources = collect_claude_md_sources(state)
+
         # Create CLAUDE.md in the sandbox root
         claude_sandbox_section = ""
         if !isnothing(state.claude_sandbox_dir) && isdir(state.claude_sandbox_dir)
@@ -1018,7 +1065,7 @@ Please check `/root/.claude_sandbox/CLAUDE_SANDBOX.md` for any custom configurat
 """
         end
 
-        claude_md_content = """
+        base_claude_md_content = """
 # ClaudeBox Sandbox Environment
 
 You are running inside a ClaudeBox sandbox - a secure, isolated environment.
@@ -1069,6 +1116,9 @@ end)$claude_sandbox_section
 - Always use Julia nightly (`+nightly`) when resolving dependencies to ensure compatibility
 - This ensures all JLL packages and dependencies are properly resolved and installed
 """
+
+        user_claude_md_content = merge_claude_md_sources(claude_md_sources)
+        claude_md_content = base_claude_md_content * "\n\n" * user_claude_md_content
 
         run(exe, config, `/bin/sh -c "mkdir /etc/claude-code && cat > /etc/claude-code/CLAUDE.md << 'EOF'
 $claude_md_content
