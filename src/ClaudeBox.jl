@@ -26,6 +26,7 @@ const BOLD = "\033[1m"
 # Constants
 const TOOLS_SCRATCH_KEY = "claude_code_sandbox_tools"
 const CLAUDE_SCRATCH_KEY = "claude_code_sandbox_settings"
+const JULIA_DEPOT_SCRATCH_KEY = "claude_code_sandbox_julia_depot"
 const VERSION = "1.0.0"
 
 # Helper functions for colored output
@@ -35,6 +36,7 @@ cprintln(color, text) = println(color, text, RESET)
 mutable struct AppState
     tools_prefix::String
     claude_prefix::String
+    julia_depot_prefix::String
     nodejs_dir::String
     npm_dir::String
     gh_cli_dir::String
@@ -119,6 +121,8 @@ function _main(args::Vector{String})::Cint
         reset_tools()
     elseif options["reset_all"]
         reset_all()
+    elseif options["reset_julia"]
+        reset_julia()
     end
 
     # Initialize application state
@@ -232,6 +236,7 @@ function parse_args(args::Vector{String})
         "version" => false,
         "reset" => false,
         "reset_all" => false,
+        "reset_julia" => false,
         "work_dir" => pwd(),
         "no_github_auth" => false,
         "dangerous_github_auth" => false,
@@ -251,6 +256,8 @@ function parse_args(args::Vector{String})
             options["reset"] = true
         elseif arg == "--reset-all"
             options["reset_all"] = true
+        elseif arg == "--reset-julia"
+            options["reset_julia"] = true
         elseif arg == "--no-github-auth"
             options["no_github_auth"] = true
         elseif arg == "--dangerous-github-auth"
@@ -308,6 +315,7 @@ function print_help()
         -w, --work-dir DIR  Directory to mount as /workspace (default: current)
         --reset             Reset tools (Node.js, npm, git, gh) but keep Claude settings
         --reset-all         Reset everything including Claude settings
+        --reset-julia       Reset Julia depot only (packages and registries)
         --no-github-auth    Skip GitHub authentication (enabled by default)
         --dangerous-github-auth  Use GitHub auth with broader permissions (repo creation, etc)
         --bash              Keep bash shell open after claude exits
@@ -351,6 +359,7 @@ end
 function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false)::AppState
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
+    julia_depot_prefix = @get_scratch!(JULIA_DEPOT_SCRATCH_KEY)
 
     nodejs_dir = joinpath(tools_prefix, "nodejs")
     npm_dir = joinpath(tools_prefix, "npm")
@@ -358,7 +367,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     build_tools_dir = joinpath(tools_prefix, "build_tools")
     toolchain_dir = joinpath(tools_prefix, "toolchain")
     juliaup_dir = joinpath(tools_prefix, "juliaup")
-    julia_dir = joinpath(tools_prefix, "julia")
+    julia_dir = joinpath(julia_depot_prefix, "depot")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
     gemini_home_dir = joinpath(claude_prefix, "gemini_home")
 
@@ -377,7 +386,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
 end
 
 """
@@ -421,6 +430,16 @@ function reset_all()
     cprintln(YELLOW, "Resetting everything (tools and Claude settings)...")
     clear_scratchspaces!(@__MODULE__)
     cprintln(GREEN, "✓ Full reset complete")
+    println()
+end
+
+function reset_julia()
+    cprintln(YELLOW, "Resetting Julia depot...")
+    scratch_path = @get_scratch!(JULIA_DEPOT_SCRATCH_KEY)
+    if isdir(scratch_path)
+        rm(scratch_path; recursive=true, force=true)
+    end
+    cprintln(GREEN, "✓ Julia depot reset complete")
     println()
 end
 

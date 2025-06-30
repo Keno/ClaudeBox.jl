@@ -69,6 +69,16 @@ Clear all cached data and reinstall:
 ./bin/claudebox --reset
 ```
 
+Reset only the Julia depot (packages and registries):
+```bash
+./bin/claudebox --reset-julia
+```
+
+Reset everything including Claude settings:
+```bash
+./bin/claudebox --reset-all
+```
+
 ### GitHub Authentication with Broader Permissions
 
 By default, GitHub authentication uses minimal permissions. For broader access including repository creation:
