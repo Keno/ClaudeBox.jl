@@ -571,7 +571,7 @@ function install_jll_tool(tool_name::String, jll_name::String, bin_path::String,
         platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
         delete!(platform.tags, "julia_version")
 
-        artifact_paths = collect_artifact_paths([jll_name]; platform=platform)
+        artifact_paths = collect_artifact_paths([jll_name]; platform=platform, project_dir=dirname(@__DIR__))
         deploy_artifact_paths(install_dir, artifact_paths)
 
         # Run post-install hook if provided
@@ -702,7 +702,7 @@ function setup_environment!(state::AppState)
         # Collect all build tool artifacts together
         platform = Base.BinaryPlatforms.HostPlatform()
         delete!(platform.tags, "julia_version")
-        artifact_paths = collect_artifact_paths(build_tools_jlls; platform)
+        artifact_paths = collect_artifact_paths(build_tools_jlls; platform, project_dir=dirname(@__DIR__))
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
 
         cprintln(GREEN, "  ✓ Build tools installed")
@@ -797,14 +797,14 @@ esac
     state.gemini_installed = isfile(gemini_bin)
 
     # Check and install both CLIs if needed
-    clis_to_install = Tuple{String, String, Bool}[]
+    clis_to_install = Tuple{String, String}[]
 
     if !state.claude_installed
-        push!(clis_to_install, ("claude-code", "@anthropic-ai/claude-code", true))
+        push!(clis_to_install, ("claude-code", "@anthropic-ai/claude-code"))
     end
 
     if !state.gemini_installed
-        push!(clis_to_install, ("gemini", "@google/gemini-cli", false))
+        push!(clis_to_install, ("gemini", "@google/gemini-cli"))
     end
 
     if isempty(clis_to_install)
@@ -815,7 +815,7 @@ esac
             config = create_sandbox_config(state)
         end
 
-        for (cli_name, npm_package, needs_workaround) in clis_to_install
+        for (cli_name, npm_package) in clis_to_install
             println()
             cprintln(YELLOW, "Installing $cli_name...")
 
@@ -826,14 +826,6 @@ esac
 
                     # Install the CLI with output
                     run(exe, config, `/opt/nodejs/bin/npm install -g $npm_package`)
-
-                    # Workaround for https://github.com/anthropics/claude-code/issues/927
-                    # The UID check gives wrong values in sandboxed environments
-                    # Only apply this for claude-code, not gemini
-                    if needs_workaround
-                        cli_path = "/opt/npm/lib/node_modules/@anthropic-ai/claude-code/cli.js"
-                        run(exe, config, `/bin/sh -c "sed -i 's/process\\.getuid()===0/false/g' $cli_path"`)
-                    end
 
                     cprintln(GREEN, "✓ $cli_name installed successfully!")
                     return true
@@ -940,6 +932,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "USER" => "root",
         "WORKSPACE" => "/workspace",
         "JULIA_DEPOT_PATH" => "/root/.julia",
+        "IS_SANDBOX" => "1"
     )
 
     # Add toolchain environment variables if toolchain is installed
