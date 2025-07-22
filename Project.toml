@@ -1,7 +1,7 @@
 name = "ClaudeBox"
 uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
-version = "1.1.0"
 authors = ["Claude Assistant"]
+version = "1.1.0"
 
 [deps]
 BinaryBuilder2 = "12aac903-9f7c-5d81-afc2-d9565ea332af"
@@ -44,27 +44,94 @@ libstdcxx_jll = "3ba1ab17-c18f-5d2d-9d5a-db37f286de95"
 procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
 ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
-[sources]
-BinaryBuilder2 = {rev = "kf/fixerror", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderAuditor = {rev = "main", subdir = "BinaryBuilderAuditor.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderGitUtils = {rev = "main", subdir = "BinaryBuilderGitUtils.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderPlatformExtensions = {rev = "main", subdir = "BinaryBuilderPlatformExtensions.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderProducts = {rev = "main", subdir = "BinaryBuilderProducts.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderToolchains = {rev = "main", subdir = "BinaryBuilderToolchains.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-Binutils_jll = {rev = "main", url = "https://github.com/staticfloat/Binutils_jll.jl"}
-GCC_crt_objects_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"}
-GCC_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_jll.jl"}
-GCC_support_libraries_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"}
-Glibc_jll = {rev = "main", url = "https://github.com/staticfloat/Glibc_jll.jl"}
-JLLGenerator = {rev = "main", subdir = "JLLGenerator.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-JLLPrefixes = {rev = "main", url = "https://github.com/JuliaPackaging/JLLPrefixes.jl.git"}
-KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-LinuxKernelHeaders_jll = {rev = "main", url = "https://github.com/staticfloat/LinuxKernelHeaders_jll.jl"}
-MultiHashParsing = {rev = "main", subdir = "MultiHashParsing.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-OutputCollectors = {rev = "master", url = "https://github.com/JuliaPackaging/OutputCollectors.jl"}
-Sandbox = {rev = "main", url = "https://github.com/JuliaContainerization/Sandbox.jl"}
-TreeArchival = {rev = "main", subdir = "TreeArchival.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
-libstdcxx_jll = {rev = "main", url = "https://github.com/staticfloat/libstdcxx_jll.jl"}
+[sources.BinaryBuilder2]
+rev = "kf/fixerror"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderAuditor]
+rev = "main"
+subdir = "BinaryBuilderAuditor.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderGitUtils]
+rev = "main"
+subdir = "BinaryBuilderGitUtils.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderPlatformExtensions]
+rev = "main"
+subdir = "BinaryBuilderPlatformExtensions.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderProducts]
+rev = "main"
+subdir = "BinaryBuilderProducts.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderToolchains]
+rev = "main"
+subdir = "BinaryBuilderToolchains.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.Binutils_jll]
+rev = "main"
+url = "https://github.com/staticfloat/Binutils_jll.jl"
+
+[sources.GCC_crt_objects_jll]
+rev = "main"
+url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"
+
+[sources.GCC_jll]
+rev = "main"
+url = "https://github.com/staticfloat/GCC_jll.jl"
+
+[sources.GCC_support_libraries_jll]
+rev = "main"
+url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"
+
+[sources.Glibc_jll]
+rev = "main"
+url = "https://github.com/staticfloat/Glibc_jll.jl"
+
+[sources.JLLGenerator]
+rev = "main"
+subdir = "JLLGenerator.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.JLLPrefixes]
+rev = "main"
+url = "https://github.com/JuliaPackaging/JLLPrefixes.jl.git"
+
+[sources.KeywordArgumentExtraction]
+rev = "main"
+subdir = "KeywordArgumentExtraction.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.LinuxKernelHeaders_jll]
+rev = "main"
+url = "https://github.com/staticfloat/LinuxKernelHeaders_jll.jl"
+
+[sources.MultiHashParsing]
+rev = "main"
+subdir = "MultiHashParsing.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.OutputCollectors]
+rev = "master"
+url = "https://github.com/JuliaPackaging/OutputCollectors.jl"
+
+[sources.Sandbox]
+rev = "main"
+url = "https://github.com/JuliaContainerization/Sandbox.jl"
+
+[sources.TreeArchival]
+rev = "main"
+subdir = "TreeArchival.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"
+
+[sources.libstdcxx_jll]
+rev = "main"
+url = "https://github.com/staticfloat/libstdcxx_jll.jl"
 
 [compat]
 BinaryBuilder2 = "2.0.0"
@@ -78,7 +145,7 @@ JLLGenerator = "0.3.1"
 JLLPrefixes = "0.3"
 KeywordArgumentExtraction = "1.0.0"
 MultiHashParsing = "0.1.0"
-OutputCollectors = "1.0.0"
+OutputCollectors = "1.0.0, 0.1"
 Python_jll = "3.10.14"
 REPL = "1.10"
 Sandbox = "2.1"
