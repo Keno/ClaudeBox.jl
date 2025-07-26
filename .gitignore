@@ -5,9 +5,6 @@
 *.ji
 compiled/
 
-# Dependency manifests
-Manifest.toml
-
 # System files
 .DS_Store
 Thumbs.db
