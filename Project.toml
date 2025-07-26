@@ -73,7 +73,6 @@ GCC_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_jll.jl"}
 GCC_support_libraries_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"}
 Glibc_jll = {rev = "main", url = "https://github.com/staticfloat/Glibc_jll.jl"}
 JLLGenerator = {rev = "main", subdir = "JLLGenerator.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-JLLPrefixes = {path = "/home/keno/.julia/dev/JLLPrefixes"}
 KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 LLVMCompilerRT_jll = {rev = "main", url = "https://github.com/staticfloat/LLVMCompilerRT_jll.jl"}
 LLVMLibcxx_jll = {rev = "main", url = "https://github.com/staticfloat/LLVMLibcxx_jll.jl"}
