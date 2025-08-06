@@ -60,76 +60,49 @@ ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
 [sources]
 BinaryBuilder2 = {rev = "kf/fixerror", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderAuditor = {rev = "main", subdir = "BinaryBuilderAuditor.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderGitUtils = {rev = "main", subdir = "BinaryBuilderGitUtils.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderPlatformExtensions = {rev = "main", subdir = "BinaryBuilderPlatformExtensions.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderProducts = {rev = "main", subdir = "BinaryBuilderProducts.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderSources = {rev = "main", subdir = "BinaryBuilderSources.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderToolchains = {rev = "main", subdir = "BinaryBuilderToolchains.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-Binutils_jll = {rev = "main", url = "https://github.com/staticfloat/Binutils_jll.jl"}
 CCTools_jll = {rev = "main", url = "https://github.com/staticfloat/CCTools_jll.jl"}
 GCC_crt_objects_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"}
 GCC_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_jll.jl"}
 GCC_support_libraries_jll = {rev = "main", url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"}
-Glibc_jll = {rev = "main", url = "https://github.com/staticfloat/Glibc_jll.jl"}
-JLLGenerator = {rev = "main", subdir = "JLLGenerator.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-LLVMCompilerRT_jll = {rev = "main", url = "https://github.com/staticfloat/LLVMCompilerRT_jll.jl"}
-LLVMLibcxx_jll = {rev = "main", url = "https://github.com/staticfloat/LLVMLibcxx_jll.jl"}
 LLVMLibunwind_jll = {rev = "main", url = "https://github.com/staticfloat/LLVMLibunwind_jll.jl"}
-LibCURL_jll = {rev = "ad3381a9f33efc0191a7386c8a3550b0901214ce", url = "https://github.com/JuliaBinaryWrappers/LibCURL_jll.jl.git"}
-LibSSH2_jll = {rev = "7420980a4cccec91aff7d63333c9c7401dcf1c58", url = "https://github.com/JuliaBinaryWrappers/LibSSH2_jll.jl.git"}
-LinuxKernelHeaders_jll = {rev = "main", url = "https://github.com/staticfloat/LinuxKernelHeaders_jll.jl"}
-MbedTLS_jll = {rev = "d8e3e95f08ed4bed38c6eb201b0d0f6e50e2c159", url = "https://github.com/JuliaBinaryWrappers/MbedTLS_jll.jl.git"}
 Mingw_jll = {rev = "main", url = "https://github.com/staticfloat/Mingw_jll.jl"}
-MultiHashParsing = {rev = "main", subdir = "MultiHashParsing.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 OutputCollectors = {rev = "master", url = "https://github.com/JuliaPackaging/OutputCollectors.jl"}
-Sandbox = {rev = "main", url = "https://github.com/JuliaContainerization/Sandbox.jl"}
-TreeArchival = {rev = "main", subdir = "TreeArchival.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
-Zlib_jll = {rev = "2c0602d8ec8557ee3f0beb7fd60b324bfc5def82", url = "https://github.com/JuliaBinaryWrappers/Zlib_jll.jl.git"}
-libLLVM_jll = {rev = "main", url = "https://github.com/staticfloat/libLLVM_jll.jl"}
 libstdcxx_jll = {rev = "main", url = "https://github.com/staticfloat/libstdcxx_jll.jl"}
-libtapi_jll = {rev = "main", url = "https://github.com/staticfloat/libtapi_jll.jl"}
-macOSSDK_jll = {rev = "main", url = "https://github.com/staticfloat/macOSSDK_jll.jl"}
-nghttp2_jll = {rev = "8305e1ce8c66493010f495ac600055c80cb78d2e", url = "https://github.com/JuliaBinaryWrappers/nghttp2_jll.jl.git"}
 
 [compat]
-BinaryBuilder2 = "2.0.0"
-BinaryBuilderAuditor = "0.1.0"
-BinaryBuilderGitUtils = "0.1.1"
-BinaryBuilderPlatformExtensions = "0.1.0"
-BinaryBuilderProducts = "0.1.0"
-BinaryBuilderSources = "0.1.0"
-BinaryBuilderToolchains = "0.2.0"
-Binutils_jll = "2.41.1"
-CCTools_jll = "986.0.1"
-GCC_crt_objects_jll = "14.2.0"
-GCC_jll = "14.2.0"
-GCC_support_libraries_jll = "14.2.0"
-JLLGenerator = "0.3.1"
-KeywordArgumentExtraction = "1.0.0"
-LLVMCompilerRT_jll = "17.0.7"
-LLVMLibcxx_jll = "17.0.0"
-LLVMLibunwind_jll = "17.0.0"
-LibCURL_jll = "8.6.0"
-LibSSH2_jll = "1.11.0"
-MbedTLS_jll = "2.28.6"
-Mingw_jll = "11.0.1"
-MultiHashParsing = "0.1.0"
-OutputCollectors = "1.0.0"
-Python_jll = "3.10.14"
+BinaryBuilder2 = "2.0"
+BinaryBuilderAuditor = "0.1"
+BinaryBuilderGitUtils = "0.1"
+BinaryBuilderPlatformExtensions = "0.1"
+BinaryBuilderProducts = "0.1"
+BinaryBuilderSources = "0.1"
+BinaryBuilderToolchains = "0.2"
+Binutils_jll = "2.41"
+CCTools_jll = "986.0"
+GCC_crt_objects_jll = "14.2"
+GCC_jll = "14.2"
+GCC_support_libraries_jll = "14.2"
+JLLGenerator = "0.3"
+KeywordArgumentExtraction = "1.0"
+LibCURL_jll = "8.6"
+LibSSH2_jll = "1.11"
+MbedTLS_jll = "2.28"
+Mingw_jll = "11.0"
+MultiHashParsing = "0.1"
+OutputCollectors = "1.0"
+Python_jll = "3.10"
 REPL = "1.10"
 Sandbox = "2.1"
 Scratch = "1.2"
-TreeArchival = "0.1.0"
-Zlib_jll = "1.2.13"
-jq_jll = "1.7.1"
+TreeArchival = "0.1"
+Zlib_jll = "1.2"
+jq_jll = "1.7"
 julia = "1.11"
-ldid_jll = "2.1.4"
-libstdcxx_jll = "14.2.0"
-libtapi_jll = "1300.6.1"
-macOSSDK_jll = "11.1.1"
-nghttp2_jll = "1.59.0"
+ldid_jll = "2.1"
+libstdcxx_jll = "14.2"
+libtapi_jll = "1300.6"
+macOSSDK_jll = "11"
+nghttp2_jll = "1.59"
 
 [apps.claudebox]
 
