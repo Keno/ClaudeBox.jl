@@ -571,7 +571,7 @@ function install_jll_tool(tool_name::String, jll_name::String, bin_path::String,
         platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
         delete!(platform.tags, "julia_version")
 
-        artifact_paths = collect_artifact_paths([jll_name]; platform=platform, project_dir=dirname(@__DIR__))
+        artifact_paths = collect_artifact_paths([jll_name]; platform=platform, project_dir=joinpath(dirname(@__DIR__), "tools"))
         deploy_artifact_paths(install_dir, artifact_paths)
 
         # Run post-install hook if provided
@@ -702,7 +702,7 @@ function setup_environment!(state::AppState)
         # Collect all build tool artifacts together
         platform = Base.BinaryPlatforms.HostPlatform()
         delete!(platform.tags, "julia_version")
-        artifact_paths = collect_artifact_paths(build_tools_jlls; platform, project_dir=dirname(@__DIR__))
+        artifact_paths = collect_artifact_paths(build_tools_jlls; platform, project_dir=joinpath(dirname(@__DIR__), "tools"))
         deploy_artifact_paths(state.build_tools_dir, artifact_paths)
 
         cprintln(GREEN, "  ✓ Build tools installed")
