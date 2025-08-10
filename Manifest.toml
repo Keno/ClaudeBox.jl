@@ -2,7 +2,7 @@
 
 julia_version = "1.13.0-DEV"
 manifest_format = "2.0"
-project_hash = "5c24f9783ac6d55199149cb5874a0898871519b8"
+project_hash = "28815f4f063823bbeb331fc226b2a74c259d6de3"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -84,38 +84,10 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "33566f4c-336c-3150-6d30-4374274e6143"
 version = "0.2.0"
 
-[[deps.Binutils_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "1c2cf2bcdda93a655dae772f875d0efb12271c32"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/Binutils_jll.jl"
-uuid = "489e263e-5428-50b0-a723-147a141b401e"
-version = "2.41.1"
-
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
 uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
 version = "0.1.9"
-
-[[deps.Bzip2_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
-uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
-version = "1.0.9+0"
-
-[[deps.CCTools_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl", "Zlib_jll", "libtapi_jll"]
-git-tree-sha1 = "c4f67fcf9fcd3523d59398b6195c5b083d482c5f"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/CCTools_jll.jl"
-uuid = "1e42d1a4-ec21-5f39-ae07-c1fb720fbc4b"
-version = "986.0.1"
-
-[[deps.CURL_jll]]
-deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "Zlib_jll", "nghttp2_jll"]
-git-tree-sha1 = "574b2e28b5b72d04383bbcd522f8fc70572f2d92"
-uuid = "b21e61f3-bafc-59ac-ab14-4c5c62d6588d"
-version = "8.14.1+0"
 
 [[deps.Ccache_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Zlib_jll", "Zstd_jll"]
@@ -123,14 +95,8 @@ git-tree-sha1 = "ff8d49ca66b9731888e3a7dcdda74b5342a5a6fc"
 uuid = "c6bc53e4-e6d8-51d9-af6d-d7969aa08f60"
 version = "4.9.1+0"
 
-[[deps.Clang_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "TOML", "Zlib_jll", "libLLVM_jll"]
-git-tree-sha1 = "f674d30f60c027b575d75cfaa82613e007060068"
-uuid = "0ee61d77-7f21-5576-8119-9fcc46b10100"
-version = "20.1.2+0"
-
 [[deps.ClaudeBox]]
-deps = ["BinaryBuilder2", "BinaryBuilderAuditor", "BinaryBuilderGitUtils", "BinaryBuilderPlatformExtensions", "BinaryBuilderProducts", "BinaryBuilderSources", "BinaryBuilderToolchains", "Binutils_jll", "CCTools_jll", "CURL_jll", "Clang_jll", "GCC_crt_objects_jll", "GCC_jll", "GCC_support_libraries_jll", "GNUMake_jll", "GitHub", "Git_jll", "Glibc_jll", "HTTP", "JLLGenerator", "JLLPrefixes", "JSON", "KeywordArgumentExtraction", "LLD_jll", "LLVMCompilerRT_jll", "LLVMLibcxx_jll", "LLVMLibunwind_jll", "LibCURL_jll", "LibSSH2_jll", "LinuxKernelHeaders_jll", "MbedTLS_jll", "Mingw_jll", "MultiHashParsing", "NodeJS_22_jll", "OutputCollectors", "Python_jll", "REPL", "Sandbox", "Scratch", "TreeArchival", "Zlib_jll", "gh_cli_jll", "jq_jll", "juliaup_jll", "ldid_jll", "less_jll", "libLLVM_jll", "libstdcxx_jll", "libtapi_jll", "macOSSDK_jll", "nghttp2_jll", "procps_jll", "ripgrep_jll"]
+deps = ["BinaryBuilder2", "BinaryBuilderAuditor", "BinaryBuilderGitUtils", "BinaryBuilderPlatformExtensions", "BinaryBuilderProducts", "BinaryBuilderSources", "BinaryBuilderToolchains", "GitHub", "HTTP", "JLLGenerator", "JLLPrefixes", "JSON", "KeywordArgumentExtraction", "MultiHashParsing", "OutputCollectors", "REPL", "Sandbox", "Scratch", "TreeArchival"]
 path = "."
 uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
 version = "1.1.0"
@@ -143,9 +109,9 @@ version = "0.7.8"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
-git-tree-sha1 = "3a3dfb30697e96a440e4149c8c51bf32f818c0f3"
+git-tree-sha1 = "0037835448781bb46feb39866934e243886d756a"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "4.17.0"
+version = "4.18.0"
 
     [deps.Compat.extensions]
     CompatLinearAlgebraExt = "LinearAlgebra"
@@ -201,36 +167,6 @@ version = "0.1.10"
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 version = "1.11.0"
 
-[[deps.GCC_crt_objects_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "8bcfd84488f5cec1cb38bd77577813b034fcb8ed"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/GCC_crt_objects_jll.jl"
-uuid = "7bc14925-bf4e-535d-80f2-90698dc22d13"
-version = "14.2.0"
-
-[[deps.GCC_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "549c63a5b2c033c3e94c7b58cffa8b7ae477fe13"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/GCC_jll.jl"
-uuid = "ec15993a-68c6-5861-8652-ef539d7ffb0b"
-version = "14.2.0"
-
-[[deps.GCC_support_libraries_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "c3b6da264dc6ceecc493ee47790c228e4b2f6128"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/GCC_support_libraries_jll.jl"
-uuid = "465c4c53-7f13-5720-b733-07d6cbd50c3b"
-version = "14.2.0"
-
-[[deps.GNUMake_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "c6262e307d98050db18d977ea623fdb744303f5c"
-uuid = "6c1a3432-6b93-5c89-98b5-f3caf0c092ba"
-version = "4.4.1+0"
-
 [[deps.Git]]
 deps = ["Git_jll", "JLLWrappers", "OpenSSH_jll"]
 git-tree-sha1 = "2230a9cc32394b11a3b3aa807a382e3bbab1198c"
@@ -248,14 +184,6 @@ deps = ["Artifacts", "Expat_jll", "JLLWrappers", "LibCURL_jll", "Libdl", "Libico
 git-tree-sha1 = "cb151153e40ad40a6dbf984fcd767e1d266fcc9c"
 uuid = "f8c6e375-362e-5223-8a59-34ff63f689eb"
 version = "2.50.1+0"
-
-[[deps.Glibc_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "9b08e447453cf7316f17c7aae7d1e753263b5428"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/Glibc_jll.jl"
-uuid = "452aa2e7-e185-58db-8ff9-d3c1fa4bc997"
-version = "2.19.1"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "PrecompileTools", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
@@ -319,35 +247,6 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "45533465-3150-2073-4772-41774b207255"
 version = "1.0.0"
 
-[[deps.LLD_jll]]
-deps = ["Artifacts", "Libdl", "Zlib_jll", "libLLVM_jll"]
-uuid = "d55e3150-da41-5e91-b323-ecfd1eec6109"
-version = "20.1.2+0"
-
-[[deps.LLVMCompilerRT_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "e631709e1ced1e4580765558fb50c24752a6e048"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/LLVMCompilerRT_jll.jl"
-uuid = "4e17d02c-6bf5-513e-be62-445f41c75a11"
-version = "17.0.7"
-
-[[deps.LLVMLibcxx_jll]]
-deps = ["Artifacts", "LLVMLibunwind_jll", "LazyJLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "42f40c2f7e75eca33c348c9f36249b1558e3c64b"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/LLVMLibcxx_jll.jl"
-uuid = "899a7460-a157-599b-96c7-ccb58ef9beb5"
-version = "17.0.0"
-
-[[deps.LLVMLibunwind_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "f5ed71e43d69f859082324964504db95c8de742e"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/LLVMLibunwind_jll.jl"
-uuid = "871c935c-5660-55ad-bb68-d1283357316b"
-version = "17.0.0"
-
 [[deps.LazilyInitializedFields]]
 git-tree-sha1 = "0f2da712350b020bc3957f269c9caad516383ee0"
 uuid = "0e77f7df-68c5-4e49-93ce-4cd80f5598bf"
@@ -370,11 +269,9 @@ uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
 version = "0.6.4"
 
 [[deps.LibCURL_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "Zlib_jll", "nghttp2_jll"]
-repo-rev = "ad3381a9f33efc0191a7386c8a3550b0901214ce"
-repo-url = "https://github.com/JuliaBinaryWrappers/LibCURL_jll.jl.git"
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "Zlib_jll", "Zstd_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "8.15.0+0"
+version = "8.15.0+1"
 
 [[deps.LibGit2]]
 deps = ["LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
@@ -386,28 +283,14 @@ deps = ["Artifacts", "CompilerSupportLibraries_jll", "LibSSH2_jll", "Libdl", "Op
 uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
 version = "1.9.1+0"
 
-[[deps.LibMPDec_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "ce78ec7bb8a7c6babc1e61f701fbdf36f5384a36"
-uuid = "7106de7a-f406-5ef1-84f7-3345f7341bd2"
-version = "2.5.2+0"
-
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl", "OpenSSL_jll", "Zlib_jll"]
-repo-rev = "7420980a4cccec91aff7d63333c9c7401dcf1c58"
-repo-url = "https://github.com/JuliaBinaryWrappers/LibSSH2_jll.jl.git"
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
 version = "1.11.3+1"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 version = "1.11.0"
-
-[[deps.Libffi_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "c8da7e6a91781c41a863611c7e966098d783c57a"
-uuid = "e9f186c6-92d2-5b65-8a66-fee21dc1b490"
-version = "3.4.7+0"
 
 [[deps.Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -420,14 +303,6 @@ deps = ["licensecheck_jll"]
 git-tree-sha1 = "e98bc9e1f773123cfdb1fa3d7a4c898e1f030341"
 uuid = "726dbf0d-6eb6-41af-b36c-cd770e0f00cc"
 version = "0.2.2"
-
-[[deps.LinuxKernelHeaders_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "ab61621a54e87d835836f5bbc96cf65463b44954"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/LinuxKernelHeaders_jll.jl"
-uuid = "d754bdc3-4c87-55c0-a004-f56830624a1e"
-version = "6.9.0"
 
 [[deps.LocalRegistry]]
 deps = ["Random", "RegistryInstances", "RegistryTools", "TOML", "UUIDs"]
@@ -458,19 +333,9 @@ version = "1.1.9"
 
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "926c6af3a037c68d02596a44c22ec3595f5f760b"
-repo-rev = "d8e3e95f08ed4bed38c6eb201b0d0f6e50e2c159"
-repo-url = "https://github.com/JuliaBinaryWrappers/MbedTLS_jll.jl.git"
+git-tree-sha1 = "45ad1a08605aabad6f1e7711daa84370655b4e86"
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.6+0"
-
-[[deps.Mingw_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "c41df17457ec1752582f426cd54b8fd53924530c"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/Mingw_jll.jl"
-uuid = "2d94bacf-4d71-535d-a47c-45e808015115"
-version = "11.0.1"
+version = "2.28.6+2"
 
 [[deps.Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -489,21 +354,9 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "73786568-6863-756d-6873-6168796e616d"
 version = "0.1.0"
 
-[[deps.Ncurses_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "b5e7e7ad16adfe5f68530f9f641955b5b0f12bbb"
-uuid = "68e3532b-a499-55ff-9963-d1c0c0748b3a"
-version = "6.5.1+0"
-
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.3.0"
-
-[[deps.NodeJS_22_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "898603401fb6c53f7336e5e2a904d071ff3dbc4d"
-uuid = "8fca9ca2-e7a1-5ccf-8c05-43be5a78664f"
-version = "22.15.0+0"
 
 [[deps.ObjectFile]]
 deps = ["Reexport", "StructIO"]
@@ -526,7 +379,7 @@ version = "1.5.0"
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
-version = "3.5.1+0"
+version = "3.5.2+0"
 
 [[deps.OrderedCollections]]
 git-tree-sha1 = "05868e21324cede2207c6f0f466b4bfef6d5e7ee"
@@ -569,20 +422,14 @@ version = "1.3.2"
 
 [[deps.Preferences]]
 deps = ["TOML"]
-git-tree-sha1 = "9306f6085165d270f7e3db02af26a400d580f5c6"
+git-tree-sha1 = "0f27480397253da18fe2c12a4ba4eb9eb208bf3d"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
-version = "1.4.3"
+version = "1.5.0"
 
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
-
-[[deps.Python_jll]]
-deps = ["Artifacts", "Bzip2_jll", "Expat_jll", "JLLWrappers", "LibMPDec_jll", "Libdl", "Libffi_jll", "OpenSSL_jll", "SQLite_jll", "XZ_jll", "Zlib_jll"]
-git-tree-sha1 = "76a68dfc4e6fcbcccf90e1961fa2705885699391"
-uuid = "93d3a430-8e7c-50da-8e8d-3dfcfb3baf05"
-version = "3.11.12+0"
 
 [[deps.REPL]]
 deps = ["FileWatching", "InteractiveUtils", "JuliaSyntaxHighlighting", "Markdown", "Sockets", "StyledStrings", "Unicode"]
@@ -614,12 +461,6 @@ version = "2.3.0"
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "0.7.0"
-
-[[deps.SQLite_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "9a325057cdb9b066f1f96dc77218df60fe3007cb"
-uuid = "76ed43ae-9a5d-5a62-8c75-30186b810ce8"
-version = "3.48.0+0"
 
 [[deps.Sandbox]]
 deps = ["EnumX", "LazyArtifacts", "Libdl", "Preferences", "Random", "SHA", "Scratch", "TOML", "Tar", "Tar_jll", "UserNSSandbox_jll"]
@@ -736,16 +577,8 @@ git-tree-sha1 = "79dc57555c873394aa67457f9c6022068da7b04a"
 uuid = "b88861f7-1d72-59dd-91e7-a8cc876a4984"
 version = "2025.1.28+0"
 
-[[deps.XZ_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "fee71455b0aaa3440dfdd54a9a36ccef829be7d4"
-uuid = "ffd25f8a-64ca-5728-b0f7-c24cf3aae800"
-version = "5.8.1+0"
-
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
-repo-rev = "2c0602d8ec8557ee3f0beb7fd60b324bfc5def82"
-repo-url = "https://github.com/JuliaBinaryWrappers/Zlib_jll.jl.git"
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
 version = "1.3.1+2"
 
@@ -760,64 +593,11 @@ git-tree-sha1 = "3c9cbd92c8044123c7d3e43f8ed5b9764d58311e"
 uuid = "5d31d589-30fb-542f-b82d-10325e863e38"
 version = "2.63.2+0"
 
-[[deps.jq_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "5a3e46f0eac9a93010d2a12710a51c53c8a582ea"
-uuid = "f8f80db2-c0ba-59e9-a5c3-38d72e3c5ac2"
-version = "1.7.1+0"
-
-[[deps.juliaup_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll"]
-git-tree-sha1 = "01c911b3504c252b5ba6743e51d66b11f9df0507"
-uuid = "038fdbe3-3777-5af9-9568-3738956aeb97"
-version = "1.17.19+0"
-
-[[deps.ldid_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "OpenSSL_jll", "libplist_jll"]
-git-tree-sha1 = "a73d18cda673c52b26c6b007b948df800f6caf44"
-uuid = "df1af0dd-2f85-5d2f-b099-55d224f7db60"
-version = "2.1.4+0"
-
-[[deps.less_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Ncurses_jll"]
-git-tree-sha1 = "0c22763fbf0227d2f6bcb07cc2bdf2b06a095ca3"
-uuid = "80e8a3d7-96cb-5b92-b346-c3bbc7c9cf8e"
-version = "679.0.0+0"
-
-[[deps.libLLVM_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl", "Zlib_jll", "Zstd_jll"]
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/libLLVM_jll.jl"
-uuid = "8f36deef-c2a5-5394-99ed-8e07531fb29a"
-version = "20.1.2+1"
-
-[[deps.libplist_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "5351e80f9c5171b6ff0fe8cf8b35ff36486f9f74"
-uuid = "7bef5416-8376-5e75-ab4d-144910ca2ef4"
-version = "2.6.0+0"
-
 [[deps.libsodium_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "011b0a7331b41c25524b64dc42afc9683ee89026"
 uuid = "a9144af2-ca23-56d9-984f-0d03f7b5ccf8"
 version = "1.0.21+0"
-
-[[deps.libstdcxx_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "e346141c3643bc95ea7a4c7d90fa613d30d5ffa6"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/libstdcxx_jll.jl"
-uuid = "3ba1ab17-c18f-5d2d-9d5a-db37f286de95"
-version = "14.2.0"
-
-[[deps.libtapi_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "3be8c2d88cbb6c68d695a44e51dc98782912c21c"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/libtapi_jll.jl"
-uuid = "defda0c2-6d1f-5f19-8ead-78afca958a10"
-version = "1300.6.1"
 
 [[deps.licensecheck_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -825,18 +605,8 @@ git-tree-sha1 = "b790ad21ac235c39c0eb34214ccf3d5f5ea60efa"
 uuid = "4ecb348a-8b88-51ea-b912-4c460483ee91"
 version = "0.3.101+0"
 
-[[deps.macOSSDK_jll]]
-deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
-git-tree-sha1 = "4cee75ff05793368d7d0c84f22767a322ee165bc"
-repo-rev = "main"
-repo-url = "https://github.com/staticfloat/macOSSDK_jll.jl"
-uuid = "52f8e75f-aed1-5264-b4c9-b8da5a6d5365"
-version = "11.1.1"
-
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
-repo-rev = "8305e1ce8c66493010f495ac600055c80cb78d2e"
-repo-url = "https://github.com/JuliaBinaryWrappers/nghttp2_jll.jl.git"
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 version = "1.65.0+0"
 
@@ -844,15 +614,3 @@ version = "1.65.0+0"
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 version = "17.5.0+2"
-
-[[deps.procps_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Ncurses_jll"]
-git-tree-sha1 = "9e708985323c70effc9f6bb3061d3490d28ed721"
-uuid = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
-version = "4.0.5+0"
-
-[[deps.ripgrep_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "6e59af612f2d43010b7721e2edb19c26ce1d6c47"
-uuid = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
-version = "13.0.0+0"

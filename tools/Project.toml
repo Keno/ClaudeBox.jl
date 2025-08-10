@@ -1,0 +1,9 @@
+[deps]
+CURL_jll = "b21e61f3-bafc-59ac-ab14-4c5c62d6588d"
+NodeJS_22_jll = "8fca9ca2-e7a1-5ccf-8c05-43be5a78664f"
+Python_jll = "93d3a430-8e7c-50da-8e8d-3dfcfb3baf05"
+gh_cli_jll = "5d31d589-30fb-542f-b82d-10325e863e38"
+jq_jll = "f8f80db2-c0ba-59e9-a5c3-38d72e3c5ac2"
+less_jll = "80e8a3d7-96cb-5b92-b346-c3bbc7c9cf8e"
+procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
+ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
