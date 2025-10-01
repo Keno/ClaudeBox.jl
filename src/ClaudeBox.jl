@@ -56,6 +56,7 @@ mutable struct AppState
     claude_sandbox_dir::Union{String, Nothing}
     dangerous_github_auth::Bool
     use_gemini::Bool
+    preserve_path::Bool
 end
 
 """
@@ -126,7 +127,7 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["preserve"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
@@ -242,6 +243,7 @@ function parse_args(args::Vector{String})
         "dangerous_github_auth" => false,
         "bash" => false,
         "gemini" => false,
+        "preserve" => false,
         "claude_args" => String[]
     )
 
@@ -266,6 +268,8 @@ function parse_args(args::Vector{String})
             options["bash"] = true
         elseif arg == "--gemini"
             options["gemini"] = true
+        elseif arg == "--preserve"
+            options["preserve"] = true
         elseif arg in ["--work-dir", "-w"]
             if i < length(args)
                 i += 1
@@ -313,6 +317,7 @@ function print_help()
         -h, --help          Show this help message
         -v, --version       Show version information
         -w, --work-dir DIR  Directory to mount as /workspace (default: current)
+        --preserve          Mount directory at same path as parent instead of /workspace
         --reset             Reset tools (Node.js, npm, git, gh) but keep Claude settings
         --reset-all         Reset everything including Claude settings
         --reset-julia       Reset Julia depot only (packages and registries)
@@ -338,7 +343,7 @@ function print_help()
         claudebox --continue
 
     $(BOLD)INSIDE THE SANDBOX:$(RESET)
-        Your files are mounted at: /workspace
+        Your files are mounted at: /workspace (or preserved path with --preserve)
         Node.js is available at: /opt/nodejs/bin/node
         NPM is available at: /opt/nodejs/bin/npm
         Git is available at: /opt/build_tools/bin/git
@@ -356,7 +361,7 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, preserve_path::Bool=false)::AppState
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
     julia_depot_prefix = @get_scratch!(JULIA_DEPOT_SCRATCH_KEY)
@@ -386,7 +391,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, preserve_path)
 end
 
 """
@@ -856,6 +861,9 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     # Get host platform for debian rootfs
     host_platform = Base.BinaryPlatforms.HostPlatform()
 
+    # Determine workspace mount point
+    workspace_mount = state.preserve_path ? state.work_dir : "/workspace"
+
     # Prepare mounts using MountInfo, following BinaryBuilder2 pattern
     mounts = Dict{String, Sandbox.MountInfo}(
         "/" => Sandbox.MountInfo(Sandbox.debian_rootfs(; platform=host_platform), Sandbox.MountType.Overlayed),
@@ -864,7 +872,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/opt/gh_cli" => Sandbox.MountInfo(state.gh_cli_dir, Sandbox.MountType.ReadOnly),
         "/opt/build_tools" => Sandbox.MountInfo(state.build_tools_dir, Sandbox.MountType.ReadOnly),
         "/opt/juliaup" => Sandbox.MountInfo(state.juliaup_dir, Sandbox.MountType.ReadOnly),
-        "/workspace" => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
+        workspace_mount => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
         "/root/.gemini" => Sandbox.MountInfo(state.gemini_home_dir, Sandbox.MountType.ReadWrite),
@@ -885,9 +893,11 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     if !isdir(external_claude_projects)
         mkpath(external_claude_projects)
     end
-    mkpath(joinpath(state.claude_home_dir, "projects", "-workspace"))
+    # Convert the workspace mount to a project name (replace / with -)
+    projects_mount_name = replace(workspace_mount, "/" => "-")
+    mkpath(joinpath(state.claude_home_dir, "projects", projects_mount_name))
     # Mount it to the corresponding location inside the sandbox
-    mounts["/root/.claude/projects/-workspace"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
+    mounts["/root/.claude/projects/$projects_mount_name"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
     cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
 
     # Map external .gemini directory if it exists (overrides the sandbox gemini directory)
@@ -930,7 +940,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "TERMINFO" => "/lib/terminfo",
         "LANG" => "C.UTF-8",
         "USER" => "root",
-        "WORKSPACE" => "/workspace",
+        "WORKSPACE" => workspace_mount,
         "JULIA_DEPOT_PATH" => "/root/.julia",
         "IS_SANDBOX" => "1"
     )
@@ -965,7 +975,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         env;
         hostname = "claudebox",
         persist = true,
-        pwd = "/workspace",
+        pwd = workspace_mount,
         stdin = stdin,
         stdout = stdout,
         stderr = stderr,
@@ -977,13 +987,16 @@ end
 function run_sandbox(state::AppState)
     config = create_sandbox_config(state)
 
+    # Determine workspace mount point
+    workspace_mount = state.preserve_path ? state.work_dir : "/workspace"
+
     # Print session info
     cprintln(CYAN, "════════════════════════════════════════")
     cprintln(CYAN, "      Starting Sandbox Session")
     cprintln(CYAN, "════════════════════════════════════════")
     println()
 
-    println("📁 Workspace: $(BOLD)/workspace$(RESET) → $(state.work_dir)")
+    println("📁 Workspace: $(BOLD)$workspace_mount$(RESET) → $(state.work_dir)")
     println("🚪 Exit with: $(BOLD)exit$(RESET) or $(BOLD)Ctrl+D$(RESET)")
 
     # Always use bash, but prepare to launch claude/gemini if appropriate
@@ -1037,7 +1050,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
 
 ## Environment Details
 
-- **Workspace**: Your files are mounted at `/workspace`
+- **Workspace**: Your files are mounted at `$workspace_mount`
 - **Isolation**: This is a sandboxed environment with limited system access
 - **Tools Available**:
   - Node.js and npm for JavaScript development
@@ -1054,10 +1067,10 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
 
 ## Important Notes
 
-- You have full read/write access to `/workspace`
+- You have full read/write access to `$workspace_mount`
 - System directories are read-only or overlayed
 - Network access is available
-- The environment resets when you exit (except for `/workspace`)
+- The environment resets when you exit (except for `$workspace_mount`)
 
 ## GitHub Integration
 
