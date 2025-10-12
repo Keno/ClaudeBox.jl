@@ -1,7 +1,7 @@
 name = "ClaudeBox"
 uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
-version = "1.1.0"
 authors = ["Claude Assistant"]
+version = "1.1.0"
 
 [deps]
 BinaryBuilder2 = "12aac903-9f7c-5d81-afc2-d9565ea332af"
@@ -24,20 +24,67 @@ Sandbox = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
 Scratch = "6c6a2e73-6563-6170-7368-637461726353"
 TreeArchival = "216c6a2e-6c61-7669-6863-726165657274"
 
-[sources]
-BinaryBuilder2 = {rev = "kf/fixerror", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderAuditor = {rev = "main", subdir = "BinaryBuilderAuditor.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderGitUtils = {rev = "main", subdir = "BinaryBuilderGitUtils.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderPlatformExtensions = {rev = "main", subdir = "BinaryBuilderPlatformExtensions.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderProducts = {rev = "main", subdir = "BinaryBuilderProducts.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderSources = {rev = "main", subdir = "BinaryBuilderSources.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderToolchains = {rev = "main", subdir = "BinaryBuilderToolchains.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-JLLGenerator = {rev = "main", subdir = "JLLGenerator.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-MultiHashParsing = {rev = "main", subdir = "MultiHashParsing.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-OutputCollectors = {rev = "master", url = "https://github.com/JuliaPackaging/OutputCollectors.jl"}
-Sandbox = {rev = "main", url = "https://github.com/JuliaContainerization/Sandbox.jl"}
-TreeArchival = {rev = "main", subdir = "TreeArchival.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
+[sources.BinaryBuilder2]
+rev = "kf/fixerror"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderAuditor]
+rev = "main"
+subdir = "BinaryBuilderAuditor.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderGitUtils]
+rev = "main"
+subdir = "BinaryBuilderGitUtils.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderPlatformExtensions]
+rev = "main"
+subdir = "BinaryBuilderPlatformExtensions.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderProducts]
+rev = "main"
+subdir = "BinaryBuilderProducts.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderSources]
+rev = "main"
+subdir = "BinaryBuilderSources.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.BinaryBuilderToolchains]
+rev = "main"
+subdir = "BinaryBuilderToolchains.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.JLLGenerator]
+rev = "main"
+subdir = "JLLGenerator.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.KeywordArgumentExtraction]
+rev = "main"
+subdir = "KeywordArgumentExtraction.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.MultiHashParsing]
+rev = "main"
+subdir = "MultiHashParsing.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
+
+[sources.OutputCollectors]
+rev = "master"
+url = "https://github.com/JuliaPackaging/OutputCollectors.jl"
+
+[sources.Sandbox]
+rev = "main"
+url = "https://github.com/JuliaContainerization/Sandbox.jl"
+
+[sources.TreeArchival]
+rev = "main"
+subdir = "TreeArchival.jl"
+url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"
 
 [compat]
 BinaryBuilder2 = "2.0.0"
@@ -48,6 +95,7 @@ BinaryBuilderProducts = "0.1.0"
 BinaryBuilderSources = "0.1.0"
 BinaryBuilderToolchains = "0.2.0"
 JLLGenerator = "0.3.1"
+JSON = "1"
 KeywordArgumentExtraction = "1.0.0"
 MultiHashParsing = "0.1.0"
 OutputCollectors = "1.0.0"
