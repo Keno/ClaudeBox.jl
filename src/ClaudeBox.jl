@@ -618,7 +618,7 @@ function bb2_target_spec()
     return BinaryBuilder2.BuildTargetSpec(
         "bb2",
         platform,
-        [BinaryBuilderToolchains.CToolchain(;lock_microarchitecture=false), HostToolsToolchain(platform)],  # Use default CToolchain
+        [BinaryBuilderToolchains.CToolchain(;lock_microarchitecture=false), HostToolsToolchain()],  # Use default CToolchain
         [],  # No additional dependencies
         Set([:host, :default])
     )

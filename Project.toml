@@ -22,21 +22,23 @@ OutputCollectors = "6c11c7d4-943b-4e2b-80de-f2cfc2930a8c"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 Sandbox = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
 Scratch = "6c6a2e73-6563-6170-7368-637461726353"
+ScratchSpaceGarbageCollector = "73336863-5434-7263-5370-556e61336c43"
 TreeArchival = "216c6a2e-6c61-7669-6863-726165657274"
 
 [sources]
-BinaryBuilder2 = {rev = "kf/fixerror", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
+BinaryBuilder2 = {rev = "main", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 BinaryBuilderAuditor = {rev = "main", subdir = "BinaryBuilderAuditor.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 BinaryBuilderGitUtils = {rev = "main", subdir = "BinaryBuilderGitUtils.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 BinaryBuilderPlatformExtensions = {rev = "main", subdir = "BinaryBuilderPlatformExtensions.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 BinaryBuilderProducts = {rev = "main", subdir = "BinaryBuilderProducts.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 BinaryBuilderSources = {rev = "main", subdir = "BinaryBuilderSources.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
-BinaryBuilderToolchains = {rev = "main", subdir = "BinaryBuilderToolchains.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
+BinaryBuilderToolchains = {path = "/home/keno/.julia/dev/BinaryBuilder2/BinaryBuilderToolchains.jl"}
 JLLGenerator = {rev = "main", subdir = "JLLGenerator.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 MultiHashParsing = {rev = "main", subdir = "MultiHashParsing.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 OutputCollectors = {rev = "master", url = "https://github.com/JuliaPackaging/OutputCollectors.jl"}
 Sandbox = {rev = "main", url = "https://github.com/JuliaContainerization/Sandbox.jl"}
+ScratchSpaceGarbageCollector = {rev = "main", subdir = "ScratchSpaceGarbageCollector.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
 TreeArchival = {rev = "main", subdir = "TreeArchival.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
 
 [compat]
@@ -54,6 +56,7 @@ OutputCollectors = "1.0.0"
 REPL = "1.10"
 Sandbox = "2.1"
 Scratch = "1.2"
+ScratchSpaceGarbageCollector = "0.1.0"
 TreeArchival = "0.1.0"
 julia = "1.11"
 
