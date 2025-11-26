@@ -355,6 +355,7 @@ function print_help()
         procps is available at: /opt/build_tools/bin/ps
         curl is available at: /opt/build_tools/bin/curl
         jq is available at: /opt/build_tools/bin/jq
+        coreutils (tail, head, cat, etc.) are available at: /opt/build_tools/bin/
         juliaup is available at: /opt/juliaup/bin/juliaup
         BB2 Toolchain (GCC, Binutils, etc.) is available at: /opt/bb-*
         Claude-code is automatically installed on first run
@@ -604,9 +605,10 @@ function are_all_build_tools_installed(state::AppState)
     ps_bin = joinpath(state.build_tools_dir, "bin", "ps")
     curl_bin = joinpath(state.build_tools_dir, "bin", "curl")
     jq_bin = joinpath(state.build_tools_dir, "bin", "jq")
+    tail_bin = joinpath(state.build_tools_dir, "bin", "tail")
 
     return isfile(rg_bin) && isfile(python_bin) && isfile(less_bin) &&
-           isfile(ps_bin) && isfile(curl_bin) && isfile(jq_bin)
+           isfile(ps_bin) && isfile(curl_bin) && isfile(jq_bin) && isfile(tail_bin)
 end
 
 function bb2_target_spec()
@@ -702,7 +704,7 @@ function setup_environment!(state::AppState)
         mkpath(state.build_tools_dir)
 
         # Collect build tool artifacts (excluding toolchain components)
-        build_tools_jlls = ["ripgrep_jll", "Python_jll", "less_jll", "procps_jll", "CURL_jll", "jq_jll"]
+        build_tools_jlls = ["ripgrep_jll", "Python_jll", "less_jll", "procps_jll", "CURL_jll", "jq_jll", "coreutils_jll"]
 
         # Collect all build tool artifacts together
         platform = Base.BinaryPlatforms.HostPlatform()
@@ -1062,6 +1064,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
   - Julia (nightly) via juliaup for Julia development
   - less for file viewing and pagination
   - procps utilities (ps, pgrep, top, etc.) for process management
+  - coreutils (tail, head, cat, cp, mv, etc.) for standard file operations
   - BinaryBuilder2 Toolchain (GCC, Binutils, Glibc, etc.) for compiling C/C++ code
   - Standard Unix tools
 

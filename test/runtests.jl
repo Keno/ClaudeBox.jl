@@ -149,6 +149,7 @@ using ClaudeBox.Sandbox
         @test isfile(joinpath(state.build_tools_dir, "bin", "ps"))
         @test isfile(joinpath(state.build_tools_dir, "bin", "curl"))
         @test isfile(joinpath(state.build_tools_dir, "bin", "jq"))
+        @test isfile(joinpath(state.build_tools_dir, "bin", "tail"))
 
         # Verify other tools
         @test isfile(joinpath(state.nodejs_dir, "bin", "node"))

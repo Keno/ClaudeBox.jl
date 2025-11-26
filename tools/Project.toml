@@ -2,6 +2,7 @@
 CURL_jll = "b21e61f3-bafc-59ac-ab14-4c5c62d6588d"
 NodeJS_22_jll = "8fca9ca2-e7a1-5ccf-8c05-43be5a78664f"
 Python_jll = "93d3a430-8e7c-50da-8e8d-3dfcfb3baf05"
+coreutils_jll = "5818bda4-868b-5068-b238-e370ed6eefef"
 gh_cli_jll = "5d31d589-30fb-542f-b82d-10325e863e38"
 jq_jll = "f8f80db2-c0ba-59e9-a5c3-38d72e3c5ac2"
 juliaup_jll = "038fdbe3-3777-5af9-9568-3738956aeb97"
