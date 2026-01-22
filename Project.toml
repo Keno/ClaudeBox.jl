@@ -17,6 +17,7 @@ JLLGenerator = "73536572-7074-4e69-5270-206c4c6a2061"
 JLLPrefixes = "afc68a34-7891-4c5a-9da1-1c62935e7b0d"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 KeywordArgumentExtraction = "45533465-3150-2073-4772-41774b207255"
+LazyJLLWrappers = "21706172-204c-4d4f-5420-656854206f44"
 MultiHashParsing = "73786568-6863-756d-6873-6168796e616d"
 OutputCollectors = "6c11c7d4-943b-4e2b-80de-f2cfc2930a8c"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
@@ -35,6 +36,7 @@ BinaryBuilderSources = {rev = "main", subdir = "BinaryBuilderSources.jl", url = 
 BinaryBuilderToolchains = {rev = "main", subdir = "BinaryBuilderToolchains.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
 JLLGenerator = {rev = "main", subdir = "JLLGenerator.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 KeywordArgumentExtraction = {rev = "main", subdir = "KeywordArgumentExtraction.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
+LazyJLLWrappers = {rev = "main", subdir = "LazyJLLWrappers.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
 MultiHashParsing = {rev = "main", subdir = "MultiHashParsing.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"}
 OutputCollectors = {rev = "master", url = "https://github.com/JuliaPackaging/OutputCollectors.jl"}
 Sandbox = {rev = "main", url = "https://github.com/JuliaContainerization/Sandbox.jl"}
@@ -51,6 +53,7 @@ BinaryBuilderSources = "0.1.0"
 BinaryBuilderToolchains = "0.2.0"
 JLLGenerator = "0.3.1"
 KeywordArgumentExtraction = "1.0.0"
+LazyJLLWrappers = "1.0.3"
 MultiHashParsing = "0.1.0"
 OutputCollectors = "1.0.0"
 REPL = "1.10"

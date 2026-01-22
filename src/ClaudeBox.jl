@@ -33,6 +33,18 @@ const VERSION = "1.0.0"
 cprint(color, text) = print(color, text, RESET)
 cprintln(color, text) = println(color, text, RESET)
 
+# Check if a path exists without following symlinks (useful for symlinks with
+# absolute paths that only resolve inside the sandbox)
+function lexists(path::AbstractString)
+    try
+        lstat(path)
+        return true
+    catch e
+        e isa Base.IOError || rethrow(e)
+        return false
+    end
+end
+
 mutable struct AppState
     tools_prefix::String
     claude_prefix::String
@@ -46,6 +58,7 @@ mutable struct AppState
     julia_dir::String
     claude_home_dir::String
     gemini_home_dir::String
+    local_dir::String  # For native claude installation at ~/.local
     work_dir::String
     claude_installed::Bool
     gemini_installed::Bool
@@ -375,15 +388,22 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     julia_dir = joinpath(julia_depot_prefix, "depot")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
     gemini_home_dir = joinpath(claude_prefix, "gemini_home")
+    local_dir = joinpath(claude_prefix, "local")  # For native claude at ~/.local
 
     # Ensure directories exist, otherwise the mount will fail
-    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir)
+    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, local_dir)
         mkpath(dir)
     end
 
+    # Create bin subdirectory for native claude installation
+    mkpath(joinpath(local_dir, "bin"))
+
     # Check if claude and gemini are installed
-    claude_bin = joinpath(npm_dir, "bin", "claude")
-    claude_installed = isfile(claude_bin)
+    # Claude is installed natively to ~/.local/bin/claude (symlink to share/claude/versions/...)
+    claude_bin = joinpath(local_dir, "bin", "claude")
+    # Use lexists (lstat) instead of isfile (stat) because the native installer creates
+    # a symlink with an absolute path that only resolves inside the sandbox
+    claude_installed = lexists(claude_bin)
 
     gemini_bin = joinpath(npm_dir, "bin", "gemini")
     gemini_installed = isfile(gemini_bin)
@@ -391,7 +411,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, preserve_path)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, local_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, preserve_path)
 end
 
 """
@@ -793,26 +813,21 @@ esac
         end
     end
 
-    # Check if claude is installed
-    claude_bin = joinpath(state.npm_dir, "bin", "claude")
-    state.claude_installed = isfile(claude_bin)
+    # Check if claude is installed (native installation at ~/.local/bin/claude)
+    claude_bin = joinpath(state.local_dir, "bin", "claude")
+    # Use lexists (lstat) instead of isfile (stat) because the native installer creates
+    # a symlink with an absolute path that only resolves inside the sandbox
+    state.claude_installed = lexists(claude_bin)
 
     # Check if gemini is installed
     gemini_bin = joinpath(state.npm_dir, "bin", "gemini")
     state.gemini_installed = isfile(gemini_bin)
 
-    # Check and install both CLIs if needed
-    clis_to_install = Tuple{String, String}[]
+    # Check and install CLIs if needed
+    needs_claude = !state.claude_installed
+    needs_gemini = !state.gemini_installed
 
-    if !state.claude_installed
-        push!(clis_to_install, ("claude-code", "@anthropic-ai/claude-code"))
-    end
-
-    if !state.gemini_installed
-        push!(clis_to_install, ("gemini", "@google/gemini-cli"))
-    end
-
-    if isempty(clis_to_install)
+    if !needs_claude && !needs_gemini
         cprintln(GREEN, "✓ All CLIs are already installed")
     else
         # Create sandbox config if we haven't already
@@ -820,42 +835,60 @@ esac
             config = create_sandbox_config(state)
         end
 
-        for (cli_name, npm_package) in clis_to_install
+        # Install claude-code via native installer
+        if needs_claude
             println()
-            cprintln(YELLOW, "Installing $cli_name...")
+            cprintln(YELLOW, "Installing claude-code (native)...")
+
+            success = Sandbox.with_executor() do exe
+                try
+                    # Use the native installer script
+                    run(exe, config, `/bin/sh -c "curl -fsSL https://claude.ai/install.sh | bash"`)
+
+                    cprintln(GREEN, "✓ claude-code installed successfully!")
+                    return true
+                catch e
+                    cprintln(RED, "✗ Failed to install claude-code automatically")
+                    println("  Error: $e")
+                    println("\n  You can try installing manually inside the sandbox:")
+                    println("  $(BOLD)curl -fsSL https://claude.ai/install.sh | bash$(RESET)")
+                    return false
+                end
+            end
+            state.claude_installed = success
+        end
+
+        # Install gemini via npm
+        if needs_gemini
+            println()
+            cprintln(YELLOW, "Installing gemini...")
 
             success = Sandbox.with_executor() do exe
                 try
                     # Configure npm to reduce output
                     run(exe, config, `/bin/sh -c "echo 'fund=false\naudit=false\nprogress=false' > /opt/npm/.npmrc"`)
 
-                    # Install the CLI with output
-                    run(exe, config, `/opt/nodejs/bin/npm install -g $npm_package`)
+                    # Install gemini CLI with output
+                    run(exe, config, `/opt/nodejs/bin/npm install -g @google/gemini-cli`)
 
-                    cprintln(GREEN, "✓ $cli_name installed successfully!")
+                    cprintln(GREEN, "✓ gemini installed successfully!")
                     return true
                 catch e
-                    cprintln(RED, "✗ Failed to install $cli_name automatically")
+                    cprintln(RED, "✗ Failed to install gemini automatically")
                     println("  Error: $e")
                     println("\n  You can try installing manually inside the sandbox:")
-                    println("  $(BOLD)npm install -g $npm_package$(RESET)")
+                    println("  $(BOLD)npm install -g @google/gemini-cli$(RESET)")
                     return false
                 end
             end
-
-            # Update the appropriate installation status
-            if cli_name == "claude-code"
-                state.claude_installed = success
-            else
-                state.gemini_installed = success
-            end
+            state.gemini_installed = success
         end
     end
 
     println()
 end
 
-const SANDBOX_PATH = "/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+const SANDBOX_PATH = "/root/.local/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
     # Get host platform for debian rootfs
@@ -877,7 +910,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
         "/root/.gemini" => Sandbox.MountInfo(state.gemini_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite),
-        "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite)
+        "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite),
+        "/root/.local" => Sandbox.MountInfo(state.local_dir, Sandbox.MountType.ReadWrite)
     )
 
     # Add claude_sandbox repository if available
@@ -1017,7 +1051,7 @@ function run_sandbox(state::AppState)
             println("   $(BOLD)npm install -g @google/gemini-cli$(RESET)")
         else
             println("\n💡 To install claude-code:")
-            println("   $(BOLD)npm install -g @anthropic-ai/claude-code$(RESET)")
+            println("   $(BOLD)curl -fsSL https://claude.ai/install.sh | bash$(RESET)")
         end
     end
 

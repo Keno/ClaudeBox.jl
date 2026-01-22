@@ -2,21 +2,15 @@
 
 julia_version = "1.14.0-DEV"
 manifest_format = "2.1"
-project_hash = "db5dd35af79c938bd8af6ebc7a0073cfb876a3a5"
+project_hash = "dddcc63fa04071465f2c3361023c4e4171f12288"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.2"
 
-    [deps.ArgTools.syntax]
-    julia_version = "1.3.0"
-
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
-
-    [deps.Artifacts.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.Attr_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -25,15 +19,9 @@ registries = "General"
 uuid = "1fd713ca-387f-5abc-8002-d8b8b1623b73"
 version = "2.5.3+0"
 
-    [deps.Attr_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
-
-    [deps.Base64.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.BinaryBuilder2]]
 deps = ["Artifacts", "BinaryBuilderAuditor", "BinaryBuilderGitUtils", "BinaryBuilderPlatformExtensions", "BinaryBuilderProducts", "BinaryBuilderSources", "BinaryBuilderToolchains", "Ccache_jll", "Dates", "Downloads", "Git", "HistoricalStdlibVersions", "Infiltrator", "JLLGenerator", "JLLPrefixes", "KeywordArgumentExtraction", "LazyJLLWrappers", "Libdl", "LocalRegistry", "Logging", "LoggingExtras", "MultiHashParsing", "ObjectFile", "OrderedCollections", "OutputCollectors", "Pkg", "PrecompileTools", "Preferences", "Random", "Reexport", "RegistryTools", "SHA", "Sandbox", "Scratch", "ScratchSpaceGarbageCollector", "StyledStrings", "TOML", "Test", "TimerOutputs", "TreeArchival", "UserNSSandbox_jll", "gh_cli_jll"]
@@ -42,9 +30,6 @@ repo-rev = "main"
 repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "12aac903-9f7c-5d81-afc2-d9565ea332af"
 version = "2.0.0"
-
-    [deps.BinaryBuilder2.syntax]
-    julia_version = "1.9.0"
 
 [[deps.BinaryBuilderAuditor]]
 deps = ["BinaryBuilderPlatformExtensions", "BinaryBuilderProducts", "BinaryBuilderSources", "BinaryBuilderToolchains", "JLLGenerator", "ObjectFile", "Pkg", "StyledStrings"]
@@ -55,9 +40,6 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "53524979-5234-6e31-4220-6120654b694c"
 version = "0.1.0"
 
-    [deps.BinaryBuilderAuditor.syntax]
-    julia_version = "1.6.0"
-
 [[deps.BinaryBuilderGitUtils]]
 deps = ["Git", "Git_jll", "MultiHashParsing", "gh_cli_jll"]
 git-tree-sha1 = "ef476e0b58b3ae1d0b7e60609bcb3a05a011720c"
@@ -66,9 +48,6 @@ repo-subdir = "BinaryBuilderGitUtils.jl"
 repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "654d7472-7548-7361-4832-74694762694c"
 version = "0.1.1"
-
-    [deps.BinaryBuilderGitUtils.syntax]
-    julia_version = "1.6.0"
 
 [[deps.BinaryBuilderPlatformExtensions]]
 deps = ["OrderedCollections", "PrecompileTools", "Reexport"]
@@ -79,9 +58,6 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "213f2928-4d72-6f46-7461-4c705f634367"
 version = "0.1.0"
 
-    [deps.BinaryBuilderPlatformExtensions.syntax]
-    julia_version = "1.6.0"
-
 [[deps.BinaryBuilderProducts]]
 deps = ["BinaryBuilderSources", "JLLGenerator", "KeywordArgumentExtraction", "Libdl"]
 git-tree-sha1 = "67766a068092e42e77bc3a42b48e4e0974ae243a"
@@ -90,9 +66,6 @@ repo-subdir = "BinaryBuilderProducts.jl"
 repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "21737265-7a69-6e4f-4974-6375646f7270"
 version = "0.1.0"
-
-    [deps.BinaryBuilderProducts.syntax]
-    julia_version = "1.6.0"
 
 [[deps.BinaryBuilderSources]]
 deps = ["BinaryBuilderGitUtils", "Dates", "Downloads", "Git", "JLLPrefixes", "MultiHashParsing", "Pkg", "Random", "SHA", "Scratch", "TOML", "TimerOutputs", "TreeArchival"]
@@ -103,9 +76,6 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "316c416d-4527-6863-7465-466137743047"
 version = "0.1.0"
 
-    [deps.BinaryBuilderSources.syntax]
-    julia_version = "1.8.0"
-
 [[deps.BinaryBuilderToolchains]]
 deps = ["Artifacts", "BinaryBuilderPlatformExtensions", "BinaryBuilderSources", "HistoricalStdlibVersions", "JLLPrefixes", "LazyJLLWrappers", "NetworkOptions", "Pkg", "PrecompileTools", "Reexport", "SHA", "Scratch", "TreeArchival"]
 git-tree-sha1 = "df9afce153a64be71368b77273a6b3411bf39d31"
@@ -115,17 +85,11 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"
 uuid = "33566f4c-336c-3150-6d30-4374274e6143"
 version = "0.2.0"
 
-    [deps.BinaryBuilderToolchains.syntax]
-    julia_version = "1.9.0"
-
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
 registries = "General"
 uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
 version = "0.1.9"
-
-    [deps.BitFlags.syntax]
-    julia_version = "1.0.0"
 
 [[deps.Ccache_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Zlib_jll", "Zstd_jll"]
@@ -134,17 +98,11 @@ registries = "General"
 uuid = "c6bc53e4-e6d8-51d9-af6d-d7969aa08f60"
 version = "4.9.1+0"
 
-    [deps.Ccache_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.ClaudeBox]]
-deps = ["BinaryBuilder2", "BinaryBuilderAuditor", "BinaryBuilderGitUtils", "BinaryBuilderPlatformExtensions", "BinaryBuilderProducts", "BinaryBuilderSources", "BinaryBuilderToolchains", "GitHub", "HTTP", "JLLGenerator", "JLLPrefixes", "JSON", "KeywordArgumentExtraction", "MultiHashParsing", "OutputCollectors", "REPL", "Sandbox", "Scratch", "ScratchSpaceGarbageCollector", "TreeArchival"]
+deps = ["BinaryBuilder2", "BinaryBuilderAuditor", "BinaryBuilderGitUtils", "BinaryBuilderPlatformExtensions", "BinaryBuilderProducts", "BinaryBuilderSources", "BinaryBuilderToolchains", "GitHub", "HTTP", "JLLGenerator", "JLLPrefixes", "JSON", "KeywordArgumentExtraction", "LazyJLLWrappers", "MultiHashParsing", "OutputCollectors", "REPL", "Sandbox", "Scratch", "ScratchSpaceGarbageCollector", "TreeArchival"]
 path = "."
 uuid = "a69d1bcb-0a72-4b4d-a563-50e49d53df40"
 version = "1.1.0"
-
-    [deps.ClaudeBox.syntax]
-    julia_version = "1.11.0"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -152,9 +110,6 @@ git-tree-sha1 = "962834c22b66e32aa10f7611c08c8ca4e20749a9"
 registries = "General"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.7.8"
-
-    [deps.CodecZlib.syntax]
-    julia_version = "1.6.0"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -166,9 +121,6 @@ version = "4.18.1"
     [deps.Compat.extensions]
     CompatLinearAlgebraExt = "LinearAlgebra"
 
-    [deps.Compat.syntax]
-    julia_version = "1.6.0"
-
     [deps.Compat.weakdeps]
     Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
     LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -178,9 +130,6 @@ deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 version = "1.3.0+1"
 
-    [deps.CompilerSupportLibraries_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
 git-tree-sha1 = "d9d26935a0bcffc87d2613ce14c527c99fc543fd"
@@ -188,33 +137,21 @@ registries = "General"
 uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 version = "2.5.0"
 
-    [deps.ConcurrentUtilities.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 version = "1.11.0"
-
-    [deps.Dates.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 version = "1.7.0"
 
-    [deps.Downloads.syntax]
-    julia_version = "1.10.0"
-
 [[deps.EnumX]]
 git-tree-sha1 = "7bebc8aad6ee6217c78c5ddcf7ed289d65d0263e"
 registries = "General"
 uuid = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 version = "1.0.6"
-
-    [deps.EnumX.syntax]
-    julia_version = "1.6.0"
 
 [[deps.ExceptionUnwrapping]]
 deps = ["Test"]
@@ -223,9 +160,6 @@ registries = "General"
 uuid = "460bff9d-24e4-43bc-9d9f-a8973cb893f4"
 version = "0.1.11"
 
-    [deps.ExceptionUnwrapping.syntax]
-    julia_version = "1.3.0"
-
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "27af30de8b5445644e8ffe3bcb0d72049c089cf1"
@@ -233,24 +167,15 @@ registries = "General"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.7.3+0"
 
-    [deps.Expat_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.ExprTools]]
 git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
 registries = "General"
 uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
 version = "0.1.10"
 
-    [deps.ExprTools.syntax]
-    julia_version = "1.0.0"
-
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 version = "1.11.0"
-
-    [deps.FileWatching.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.Git]]
 deps = ["Git_LFS_jll", "Git_jll", "JLLWrappers", "OpenSSH_jll"]
@@ -259,18 +184,12 @@ registries = "General"
 uuid = "d7ba0133-e1db-5d97-8f8c-041e4b3a1eb2"
 version = "1.5.0"
 
-    [deps.Git.syntax]
-    julia_version = "1.6.6"
-
 [[deps.GitHub]]
 deps = ["Base64", "Dates", "HTTP", "JSON", "MbedTLS", "Sockets", "SodiumSeal", "URIs"]
 git-tree-sha1 = "ef535d4e8cb96c4fb6753212744ee737fad1bc50"
 registries = "General"
 uuid = "bc5e4493-9b4d-5f90-b8aa-2b2bcaad7a26"
 version = "5.12.0"
-
-    [deps.GitHub.syntax]
-    julia_version = "1.6.0"
 
 [[deps.Git_LFS_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -279,9 +198,6 @@ registries = "General"
 uuid = "020c3dae-16b3-5ae5-87b3-4cb189e250b2"
 version = "3.7.0+0"
 
-    [deps.Git_LFS_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Git_jll]]
 deps = ["Artifacts", "Expat_jll", "JLLWrappers", "LibCURL_jll", "Libdl", "Libiconv_jll", "OpenSSL_jll", "PCRE2_jll", "Zlib_jll"]
 git-tree-sha1 = "46bd50c245fe49ed87377c014a928a549b9ef7ed"
@@ -289,18 +205,12 @@ registries = "General"
 uuid = "f8c6e375-362e-5223-8a59-34ff63f689eb"
 version = "2.52.0+0"
 
-    [deps.Git_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "PrecompileTools", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
 git-tree-sha1 = "5e6fe50ae7f23d171f44e311c2960294aaa0beb5"
 registries = "General"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 version = "1.10.19"
-
-    [deps.HTTP.syntax]
-    julia_version = "1.6.0"
 
 [[deps.HistoricalStdlibVersions]]
 deps = ["Pkg", "PrecompileTools"]
@@ -310,9 +220,6 @@ repo-url = "https://github.com/JuliaPackaging/HistoricalStdlibVersions.jl.git"
 uuid = "6df8b67a-e8a0-4029-b4b7-ac196fe72102"
 version = "2.0.6"
 
-    [deps.HistoricalStdlibVersions.syntax]
-    julia_version = "1.7.0"
-
 [[deps.Infiltrator]]
 deps = ["InteractiveUtils", "Markdown", "REPL", "UUIDs"]
 git-tree-sha1 = "d07c6718c1ce7324341947f8f608f5d69795dde5"
@@ -320,16 +227,10 @@ registries = "General"
 uuid = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
 version = "1.9.7"
 
-    [deps.Infiltrator.syntax]
-    julia_version = "1.6.0"
-
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 version = "1.11.0"
-
-    [deps.InteractiveUtils.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.JLLGenerator]]
 deps = ["BinaryBuilderPlatformExtensions", "Dates", "Libdl", "LicenseCheck", "MultiHashParsing", "Pkg", "Reexport", "SHA", "StructEquality", "TOML"]
@@ -344,9 +245,6 @@ weakdeps = ["BinaryBuilderSources"]
     [deps.JLLGenerator.extensions]
     BinaryBuilderSourcesExt = "BinaryBuilderSources"
 
-    [deps.JLLGenerator.syntax]
-    julia_version = "1.9.0"
-
 [[deps.JLLPrefixes]]
 deps = ["Artifacts", "Git", "HistoricalStdlibVersions", "Pkg", "Preferences", "SHA", "Scratch"]
 git-tree-sha1 = "3b772c89f2fb0f2877e9149d3f529276ca8b33f2"
@@ -354,18 +252,12 @@ registries = "General"
 uuid = "afc68a34-7891-4c5a-9da1-1c62935e7b0d"
 version = "0.4.1"
 
-    [deps.JLLPrefixes.syntax]
-    julia_version = "1.8.0"
-
 [[deps.JLLWrappers]]
 deps = ["Artifacts", "Preferences"]
 git-tree-sha1 = "0533e564aae234aff59ab625543145446d8b6ec2"
 registries = "General"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
 version = "1.7.1"
-
-    [deps.JLLWrappers.syntax]
-    julia_version = "1.0.0"
 
 [[deps.JSON]]
 deps = ["Dates", "Logging", "Parsers", "PrecompileTools", "StructUtils", "UUIDs", "Unicode"]
@@ -377,19 +269,13 @@ version = "1.4.0"
     [deps.JSON.extensions]
     JSONArrowExt = ["ArrowTypes"]
 
-    [deps.JSON.syntax]
-    julia_version = "1.9.0"
-
     [deps.JSON.weakdeps]
     ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
 
 [[deps.JuliaSyntaxHighlighting]]
 deps = ["StyledStrings"]
 uuid = "ac6e5ff7-fb65-4e79-a425-ec3bc9c03011"
-version = "1.13.0"
-
-    [deps.JuliaSyntaxHighlighting.syntax]
-    julia_version = "1.12.0"
+version = "1.12.0"
 
 [[deps.KeywordArgumentExtraction]]
 deps = ["ExprTools", "InteractiveUtils"]
@@ -400,81 +286,54 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "45533465-3150-2073-4772-41774b207255"
 version = "1.0.0"
 
-    [deps.KeywordArgumentExtraction.syntax]
-    julia_version = "1.6.0"
-
 [[deps.LazilyInitializedFields]]
 git-tree-sha1 = "0f2da712350b020bc3957f269c9caad516383ee0"
 registries = "General"
 uuid = "0e77f7df-68c5-4e49-93ce-4cd80f5598bf"
 version = "1.3.0"
 
-    [deps.LazilyInitializedFields.syntax]
-    julia_version = "1.6.0"
-
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
 uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
 version = "1.11.0"
 
-    [deps.LazyArtifacts.syntax]
-    julia_version = "1.11.0"
-
 [[deps.LazyJLLWrappers]]
 deps = ["Artifacts", "Libdl", "Pkg", "Preferences", "TOML"]
-path = "../.julia/packages/BinaryBuilder2/ouFIS/LazyJLLWrappers.jl"
+git-tree-sha1 = "68ac343020100b308970d7bee1a0497a38b0e7fc"
+repo-rev = "main"
+repo-subdir = "LazyJLLWrappers.jl"
+repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"
 uuid = "21706172-204c-4d4f-5420-656854206f44"
 version = "1.0.3"
-
-    [deps.LazyJLLWrappers.syntax]
-    julia_version = "1.0.0"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
 version = "1.0.0"
 
-    [deps.LibCURL.syntax]
-    julia_version = "1.3.0"
-
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "Zlib_jll", "Zstd_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "8.17.0+0"
-
-    [deps.LibCURL_jll.syntax]
-    julia_version = "1.11.0"
+version = "8.16.0+0"
 
 [[deps.LibGit2]]
 deps = ["LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 version = "1.11.0"
 
-    [deps.LibGit2.syntax]
-    julia_version = "1.14.0-DEV.1492"
-
 [[deps.LibGit2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "PCRE2_jll", "Zlib_jll"]
 uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
-version = "1.9.2+0"
-
-    [deps.LibGit2_jll.syntax]
-    julia_version = "1.9.0"
+version = "1.9.1+0"
 
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl", "OpenSSL_jll", "Zlib_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
 version = "1.11.3+1"
 
-    [deps.LibSSH2_jll.syntax]
-    julia_version = "1.8.0"
-
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 version = "1.11.0"
-
-    [deps.Libdl.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -483,18 +342,12 @@ registries = "General"
 uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
 version = "1.18.0+0"
 
-    [deps.Libiconv_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.LicenseCheck]]
 deps = ["licensecheck_jll"]
 git-tree-sha1 = "9c36d53a16450b2302720c822c62b0fb903d5df7"
 registries = "General"
 uuid = "726dbf0d-6eb6-41af-b36c-cd770e0f00cc"
 version = "0.2.3"
-
-    [deps.LicenseCheck.syntax]
-    julia_version = "1.6.0"
 
 [[deps.LocalRegistry]]
 deps = ["Random", "RegistryInstances", "RegistryTools", "TOML", "UUIDs"]
@@ -503,15 +356,9 @@ registries = "General"
 uuid = "89398ba2-070a-4b16-a995-9893c55d93cf"
 version = "0.5.7"
 
-    [deps.LocalRegistry.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 version = "1.11.0"
-
-    [deps.Logging.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.LoggingExtras]]
 deps = ["Dates", "Logging"]
@@ -520,16 +367,10 @@ registries = "General"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.2.0"
 
-    [deps.LoggingExtras.syntax]
-    julia_version = "0.7.0"
-
 [[deps.Markdown]]
 deps = ["Base64", "JuliaSyntaxHighlighting", "StyledStrings"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 version = "1.11.0"
-
-    [deps.Markdown.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.MbedTLS]]
 deps = ["Dates", "MbedTLS_jll", "MozillaCACerts_jll", "NetworkOptions", "Random", "Sockets"]
@@ -538,9 +379,6 @@ registries = "General"
 uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
 version = "1.1.9"
 
-    [deps.MbedTLS.syntax]
-    julia_version = "1.6.0"
-
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "ff69a2b1330bcb730b9ac1ab7dd680176f5896b8"
@@ -548,15 +386,9 @@ registries = "General"
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.1010+0"
 
-    [deps.MbedTLS_jll.syntax]
-    julia_version = "1.9.0"
-
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2025.12.2"
-
-    [deps.MozillaCACerts_jll.syntax]
-    julia_version = "1.14.0-DEV.1492"
+version = "2025.9.9"
 
 [[deps.MultiHashParsing]]
 deps = ["SHA"]
@@ -567,15 +399,9 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl"
 uuid = "73786568-6863-756d-6873-6168796e616d"
 version = "0.1.0"
 
-    [deps.MultiHashParsing.syntax]
-    julia_version = "1.6.0"
-
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.3.0"
-
-    [deps.NetworkOptions.syntax]
-    julia_version = "1.12.0"
 
 [[deps.ObjectFile]]
 deps = ["Reexport", "StructIO"]
@@ -584,18 +410,12 @@ registries = "General"
 uuid = "d8793406-e978-5875-9003-1fc021f44a92"
 version = "0.4.4"
 
-    [deps.ObjectFile.syntax]
-    julia_version = "1.6.0"
-
 [[deps.OpenSSH_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "OpenSSL_jll", "Zlib_jll"]
 git-tree-sha1 = "301412a644646fdc0ad67d0a87487466b491e53d"
 registries = "General"
 uuid = "9bd350c2-7e96-507f-8002-3f2e150b4e1b"
 version = "10.2.1+0"
-
-    [deps.OpenSSH_jll.syntax]
-    julia_version = "1.6.0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "NetworkOptions", "OpenSSL_jll", "Sockets"]
@@ -604,25 +424,16 @@ registries = "General"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
 version = "1.6.1"
 
-    [deps.OpenSSL.syntax]
-    julia_version = "1.6.0"
-
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
 version = "3.5.4+0"
-
-    [deps.OpenSSL_jll.syntax]
-    julia_version = "1.6.0"
 
 [[deps.OrderedCollections]]
 git-tree-sha1 = "05868e21324cede2207c6f0f466b4bfef6d5e7ee"
 registries = "General"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 version = "1.8.1"
-
-    [deps.OrderedCollections.syntax]
-    julia_version = "1.7.1"
 
 [[deps.OutputCollectors]]
 deps = ["StyledStrings"]
@@ -632,16 +443,10 @@ repo-url = "https://github.com/JuliaPackaging/OutputCollectors.jl"
 uuid = "6c11c7d4-943b-4e2b-80de-f2cfc2930a8c"
 version = "1.0.0"
 
-    [deps.OutputCollectors.syntax]
-    julia_version = "1.0.0"
-
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
 version = "10.47.0+0"
-
-    [deps.PCRE2_jll.syntax]
-    julia_version = "1.6.0"
 
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
@@ -650,20 +455,14 @@ registries = "General"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.8.3"
 
-    [deps.Parsers.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "Zstd_jll", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.14.0"
+version = "1.13.0"
 weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
     REPLExt = "REPL"
-
-    [deps.Pkg.syntax]
-    julia_version = "1.12.0"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -672,9 +471,6 @@ registries = "General"
 uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 version = "1.3.3"
 
-    [deps.PrecompileTools.syntax]
-    julia_version = "1.12.0"
-
 [[deps.Preferences]]
 deps = ["TOML"]
 git-tree-sha1 = "522f093a29b31a93e34eaea17ba055d850edea28"
@@ -682,41 +478,26 @@ registries = "General"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.5.1"
 
-    [deps.Preferences.syntax]
-    julia_version = "1.0.0"
-
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
-
-    [deps.Printf.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.REPL]]
 deps = ["Dates", "FileWatching", "InteractiveUtils", "JuliaSyntaxHighlighting", "Markdown", "Sockets", "StyledStrings", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 version = "1.11.0"
 
-    [deps.REPL.syntax]
-    julia_version = "1.14.0-DEV.1492"
-
 [[deps.Random]]
 deps = ["SHA"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 version = "1.11.0"
-
-    [deps.Random.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.Reexport]]
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 registries = "General"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "1.2.2"
-
-    [deps.Reexport.syntax]
-    julia_version = "1.0.0"
 
 [[deps.RegistryInstances]]
 deps = ["LazilyInitializedFields", "Pkg", "TOML", "Tar"]
@@ -725,9 +506,6 @@ registries = "General"
 uuid = "2792f1a3-b283-48e8-9a74-f99dce5104f3"
 version = "0.1.0"
 
-    [deps.RegistryInstances.syntax]
-    julia_version = "1.6.0"
-
 [[deps.RegistryTools]]
 deps = ["LibGit2", "Pkg", "SHA", "UUIDs"]
 git-tree-sha1 = "3ccf9d64e95b4a02a707f57f4032a4c3d58f23ba"
@@ -735,15 +513,9 @@ registries = "General"
 uuid = "d1eb7eb1-105f-429d-abf5-b0f65cb9e2c4"
 version = "2.4.2"
 
-    [deps.RegistryTools.syntax]
-    julia_version = "1.6.0"
-
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "1.0.0"
-
-    [deps.SHA.syntax]
-    julia_version = "1.0.0"
 
 [[deps.Sandbox]]
 deps = ["EnumX", "LazyArtifacts", "Libdl", "Preferences", "Random", "SHA", "Scratch", "TOML", "Tar", "Tar_jll", "UserNSSandbox_jll"]
@@ -753,18 +525,12 @@ repo-url = "https://github.com/JuliaContainerization/Sandbox.jl"
 uuid = "9307e30f-c43e-9ca7-d17c-c2dc59df670d"
 version = "2.1.1"
 
-    [deps.Sandbox.syntax]
-    julia_version = "1.7.0"
-
 [[deps.Scratch]]
 deps = ["Dates"]
 git-tree-sha1 = "9b81b8393e50b7d4e6d0a9f14e192294d3b7c109"
 registries = "General"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
 version = "1.3.0"
-
-    [deps.Scratch.syntax]
-    julia_version = "1.9.0"
 
 [[deps.ScratchSpaceGarbageCollector]]
 deps = ["Dates", "Scratch", "TOML"]
@@ -775,15 +541,9 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"
 uuid = "73336863-5434-7263-5370-556e61336c43"
 version = "0.1.0"
 
-    [deps.ScratchSpaceGarbageCollector.syntax]
-    julia_version = "1.9.0"
-
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 version = "1.11.0"
-
-    [deps.Serialization.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.SimpleBufferStream]]
 git-tree-sha1 = "f305871d2f381d21527c770d4788c06c097c9bc1"
@@ -791,15 +551,9 @@ registries = "General"
 uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
 version = "1.2.0"
 
-    [deps.SimpleBufferStream.syntax]
-    julia_version = "1.3.0"
-
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
 version = "1.11.0"
-
-    [deps.Sockets.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.SodiumSeal]]
 deps = ["Base64", "Libdl", "libsodium_jll"]
@@ -808,9 +562,6 @@ registries = "General"
 uuid = "2133526b-2bfb-4018-ac12-889fb3908a75"
 version = "0.1.1"
 
-    [deps.SodiumSeal.syntax]
-    julia_version = "1.3.0"
-
 [[deps.StructEquality]]
 deps = ["Compat"]
 git-tree-sha1 = "192a9f1de3cfef80ab1a4ba7b150bb0e11ceedcf"
@@ -818,17 +569,11 @@ registries = "General"
 uuid = "6ec83bb0-ed9f-11e9-3b4c-2b04cb4e219c"
 version = "2.1.0"
 
-    [deps.StructEquality.syntax]
-    julia_version = "1.6.0"
-
 [[deps.StructIO]]
 git-tree-sha1 = "c581be48ae1cbf83e899b14c07a807e1787512cc"
 registries = "General"
 uuid = "53d494c1-5632-5724-8f4c-31dff12d585f"
 version = "0.3.1"
-
-    [deps.StructIO.syntax]
-    julia_version = "1.0.0"
 
 [[deps.StructUtils]]
 deps = ["Dates", "UUIDs"]
@@ -841,35 +586,23 @@ version = "2.6.2"
     StructUtilsMeasurementsExt = ["Measurements"]
     StructUtilsTablesExt = ["Tables"]
 
-    [deps.StructUtils.syntax]
-    julia_version = "1.9.0"
-
     [deps.StructUtils.weakdeps]
     Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
     Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
 [[deps.StyledStrings]]
 uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
-version = "1.13.0"
-
-    [deps.StyledStrings.syntax]
-    julia_version = "1.11.0"
+version = "1.11.0"
 
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 version = "1.0.3"
 
-    [deps.TOML.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
 version = "1.10.0"
-
-    [deps.Tar.syntax]
-    julia_version = "1.3.0"
 
 [[deps.Tar_jll]]
 deps = ["Artifacts", "Attr_jll", "JLLWrappers", "Libdl", "Libiconv_jll"]
@@ -878,16 +611,10 @@ registries = "General"
 uuid = "9b64493d-8859-5bf3-93d7-7c32dd38186f"
 version = "1.35.0+0"
 
-    [deps.Tar_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 version = "1.11.0"
-
-    [deps.Test.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.TimerOutputs]]
 deps = ["ExprTools", "Printf"]
@@ -899,9 +626,6 @@ version = "0.5.29"
     [deps.TimerOutputs.extensions]
     FlameGraphsExt = "FlameGraphs"
 
-    [deps.TimerOutputs.syntax]
-    julia_version = "1.10.0"
-
     [deps.TimerOutputs.weakdeps]
     FlameGraphs = "08572546-2f56-4bcf-ba4e-bab62c3a3f89"
 
@@ -910,9 +634,6 @@ git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
 registries = "General"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
-
-    [deps.TranscodingStreams.syntax]
-    julia_version = "1.6.0"
 
 [[deps.TreeArchival]]
 deps = ["SHA", "Tar", "Tar_jll", "Zstd_jll", "p7zip_jll"]
@@ -923,32 +644,20 @@ repo-url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"
 uuid = "216c6a2e-6c61-7669-6863-726165657274"
 version = "0.1.0"
 
-    [deps.TreeArchival.syntax]
-    julia_version = "1.9.0"
-
 [[deps.URIs]]
 git-tree-sha1 = "bef26fb046d031353ef97a82e3fdb6afe7f21b1a"
 registries = "General"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
 version = "1.6.1"
 
-    [deps.URIs.syntax]
-    julia_version = "1.6.0"
-
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 version = "1.11.0"
 
-    [deps.UUIDs.syntax]
-    julia_version = "1.14.0-DEV.1492"
-
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 version = "1.11.0"
-
-    [deps.Unicode.syntax]
-    julia_version = "1.14.0-DEV.1492"
 
 [[deps.UserNSSandbox_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -957,24 +666,15 @@ registries = "General"
 uuid = "b88861f7-1d72-59dd-91e7-a8cc876a4984"
 version = "2025.1.28+0"
 
-    [deps.UserNSSandbox_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
 version = "1.3.1+2"
 
-    [deps.Zlib_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.Zstd_jll]]
 deps = ["CompilerSupportLibraries_jll", "Libdl"]
 uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
 version = "1.5.7+1"
-
-    [deps.Zstd_jll.syntax]
-    julia_version = "1.6.0"
 
 [[deps.gh_cli_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -983,18 +683,12 @@ registries = "General"
 uuid = "5d31d589-30fb-542f-b82d-10325e863e38"
 version = "2.83.2+0"
 
-    [deps.gh_cli_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.libsodium_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "011b0a7331b41c25524b64dc42afc9683ee89026"
 registries = "General"
 uuid = "a9144af2-ca23-56d9-984f-0d03f7b5ccf8"
 version = "1.0.21+0"
-
-    [deps.libsodium_jll.syntax]
-    julia_version = "1.6.0"
 
 [[deps.licensecheck_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1003,24 +697,15 @@ registries = "General"
 uuid = "4ecb348a-8b88-51ea-b912-4c460483ee91"
 version = "0.4.0+0"
 
-    [deps.licensecheck_jll.syntax]
-    julia_version = "1.6.0"
-
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.68.0+1"
-
-    [deps.nghttp2_jll.syntax]
-    julia_version = "1.11.0"
+version = "1.67.1+0"
 
 [[deps.p7zip_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
+deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.7.0+0"
-
-    [deps.p7zip_jll.syntax]
-    julia_version = "1.6.0"
+version = "17.6.0+0"
 
 [registries.General]
 url = "https://github.com/JuliaRegistries/General.git"
