@@ -36,13 +36,7 @@ cprintln(color, text) = println(color, text, RESET)
 # Check if a path exists without following symlinks (useful for symlinks with
 # absolute paths that only resolve inside the sandbox)
 function lexists(path::AbstractString)
-    try
-        lstat(path)
-        return true
-    catch e
-        e isa Base.IOError || rethrow(e)
-        return false
-    end
+    return ispath(lstat(path))
 end
 
 mutable struct AppState
@@ -58,10 +52,14 @@ mutable struct AppState
     julia_dir::String
     claude_home_dir::String
     gemini_home_dir::String
-    local_dir::String  # For native claude installation at ~/.local
+    opencode_home_dir::String
+    codex_home_dir::String
+    local_dir::String  # For native claude/opencode installation at ~/.local
     work_dir::String
     claude_installed::Bool
     gemini_installed::Bool
+    opencode_installed::Bool
+    codex_installed::Bool
     github_token::String
     github_refresh_token::Union{String, Nothing}
     claude_args::Vector{String}
@@ -69,6 +67,8 @@ mutable struct AppState
     claude_sandbox_dir::Union{String, Nothing}
     dangerous_github_auth::Bool
     use_gemini::Bool
+    use_opencode::Bool
+    use_codex::Bool
     preserve_path::Bool
 end
 
@@ -140,7 +140,7 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["preserve"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
@@ -256,6 +256,8 @@ function parse_args(args::Vector{String})
         "dangerous_github_auth" => false,
         "bash" => false,
         "gemini" => false,
+        "opencode" => false,
+        "codex" => false,
         "preserve" => false,
         "claude_args" => String[]
     )
@@ -281,6 +283,10 @@ function parse_args(args::Vector{String})
             options["bash"] = true
         elseif arg == "--gemini"
             options["gemini"] = true
+        elseif arg == "--opencode"
+            options["opencode"] = true
+        elseif arg == "--codex"
+            options["codex"] = true
         elseif arg == "--preserve"
             options["preserve"] = true
         elseif arg in ["--work-dir", "-w"]
@@ -338,6 +344,8 @@ function print_help()
         --dangerous-github-auth  Use GitHub auth with broader permissions (repo creation, etc)
         --bash              Keep bash shell open after claude exits
         --gemini            Use gemini instead of claude
+        --opencode          Use opencode instead of claude
+        --codex             Use OpenAI codex instead of claude
 
     Unrecognized flags are passed through to the claude command.
 
@@ -374,7 +382,7 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, preserve_path::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false)::AppState
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
     julia_depot_prefix = @get_scratch!(JULIA_DEPOT_SCRATCH_KEY)
@@ -388,17 +396,21 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     julia_dir = joinpath(julia_depot_prefix, "depot")
     claude_home_dir = joinpath(claude_prefix, "claude_home")
     gemini_home_dir = joinpath(claude_prefix, "gemini_home")
-    local_dir = joinpath(claude_prefix, "local")  # For native claude at ~/.local
+    opencode_home_dir = joinpath(claude_prefix, "opencode_home")
+    codex_home_dir = joinpath(claude_prefix, "codex_home")
+    local_dir = joinpath(claude_prefix, "local")  # For native claude/opencode at ~/.local
 
     # Ensure directories exist, otherwise the mount will fail
-    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, local_dir)
+    for dir in (nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir)
         mkpath(dir)
     end
 
     # Create bin subdirectory for native claude installation
     mkpath(joinpath(local_dir, "bin"))
+    # Create bin subdirectory for native opencode installation
+    mkpath(joinpath(opencode_home_dir, "bin"))
 
-    # Check if claude and gemini are installed
+    # Check if claude, gemini, opencode, and codex are installed
     # Claude is installed natively to ~/.local/bin/claude (symlink to share/claude/versions/...)
     claude_bin = joinpath(local_dir, "bin", "claude")
     # Use lexists (lstat) instead of isfile (stat) because the native installer creates
@@ -408,10 +420,18 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     gemini_bin = joinpath(npm_dir, "bin", "gemini")
     gemini_installed = isfile(gemini_bin)
 
+    # Opencode is installed natively to ~/.opencode/bin/opencode
+    opencode_bin = joinpath(opencode_home_dir, "bin", "opencode")
+    opencode_installed = lexists(opencode_bin)
+
+    # Codex is installed via npm to /opt/npm/bin/codex
+    codex_bin = joinpath(npm_dir, "bin", "codex")
+    codex_installed = isfile(codex_bin)
+
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, local_dir, work_dir, claude_installed, gemini_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, preserve_path)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path)
 end
 
 """
@@ -422,16 +442,42 @@ Returns a Cmd object that can be executed directly.
 """
 function build_cli_command(state::AppState, extra_args::Vector{String}=String[]; use_full_path::Bool=false)
     # Determine which CLI to use
-    cli_name = state.use_gemini ? "gemini" : "claude"
+    cli_name = if state.use_codex
+        "codex"
+    elseif state.use_opencode
+        "opencode"
+    elseif state.use_gemini
+        "gemini"
+    else
+        "claude"
+    end
 
     # Build the executable path
-    cli_executable = use_full_path ? "/opt/npm/bin/$cli_name" : cli_name
+    # - claude uses native install at ~/.local/bin
+    # - opencode uses native install at ~/.opencode/bin
+    # - gemini and codex use npm install at /opt/npm/bin
+    cli_executable = if use_full_path
+        if state.use_gemini || state.use_codex
+            "/opt/npm/bin/$cli_name"
+        else
+            # claude and opencode are found via PATH (native installs)
+            cli_name
+        end
+    else
+        cli_name
+    end
 
     # Combine all arguments
     all_args = vcat(state.claude_args, extra_args)
 
     # Build the command using Julia's command syntax
-    if state.use_gemini
+    if state.use_codex
+        # Codex uses --full-auto for auto-approval
+        return `$cli_executable --full-auto $all_args`
+    elseif state.use_opencode
+        # Opencode auto-approves in non-interactive mode, run as-is
+        return `$cli_executable $all_args`
+    elseif state.use_gemini
         # Always run gemini in yolo mode
         return `$cli_executable --yolo $all_args`
     else
@@ -823,11 +869,21 @@ esac
     gemini_bin = joinpath(state.npm_dir, "bin", "gemini")
     state.gemini_installed = isfile(gemini_bin)
 
+    # Check if opencode is installed (native installation at ~/.opencode/bin/opencode)
+    opencode_bin = joinpath(state.opencode_home_dir, "bin", "opencode")
+    state.opencode_installed = lexists(opencode_bin)
+
+    # Check if codex is installed (npm installation at /opt/npm/bin/codex)
+    codex_bin = joinpath(state.npm_dir, "bin", "codex")
+    state.codex_installed = isfile(codex_bin)
+
     # Check and install CLIs if needed
     needs_claude = !state.claude_installed
     needs_gemini = !state.gemini_installed
+    needs_opencode = !state.opencode_installed
+    needs_codex = !state.codex_installed
 
-    if !needs_claude && !needs_gemini
+    if !needs_claude && !needs_gemini && !needs_opencode && !needs_codex
         cprintln(GREEN, "✓ All CLIs are already installed")
     else
         # Create sandbox config if we haven't already
@@ -883,12 +939,61 @@ esac
             end
             state.gemini_installed = success
         end
+
+        # Install opencode via native installer
+        if needs_opencode
+            println()
+            cprintln(YELLOW, "Installing opencode (native)...")
+
+            success = Sandbox.with_executor() do exe
+                try
+                    # Use the native installer script
+                    run(exe, config, `/bin/sh -c "curl -fsSL https://opencode.ai/install | bash"`)
+
+                    cprintln(GREEN, "✓ opencode installed successfully!")
+                    return true
+                catch e
+                    cprintln(RED, "✗ Failed to install opencode automatically")
+                    println("  Error: $e")
+                    println("\n  You can try installing manually inside the sandbox:")
+                    println("  $(BOLD)curl -fsSL https://opencode.ai/install | bash$(RESET)")
+                    return false
+                end
+            end
+            state.opencode_installed = success
+        end
+
+        # Install codex via npm
+        if needs_codex
+            println()
+            cprintln(YELLOW, "Installing codex...")
+
+            success = Sandbox.with_executor() do exe
+                try
+                    # Configure npm to reduce output
+                    run(exe, config, `/bin/sh -c "echo 'fund=false\naudit=false\nprogress=false' > /opt/npm/.npmrc"`)
+
+                    # Install codex CLI with output
+                    run(exe, config, `/opt/nodejs/bin/npm install -g @openai/codex`)
+
+                    cprintln(GREEN, "✓ codex installed successfully!")
+                    return true
+                catch e
+                    cprintln(RED, "✗ Failed to install codex automatically")
+                    println("  Error: $e")
+                    println("\n  You can try installing manually inside the sandbox:")
+                    println("  $(BOLD)npm install -g @openai/codex$(RESET)")
+                    return false
+                end
+            end
+            state.codex_installed = success
+        end
     end
 
     println()
 end
 
-const SANDBOX_PATH = "/root/.local/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+const SANDBOX_PATH = "/root/.local/bin:/root/.opencode/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
     # Get host platform for debian rootfs
@@ -909,6 +1014,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
         "/root/.gemini" => Sandbox.MountInfo(state.gemini_home_dir, Sandbox.MountType.ReadWrite),
+        "/root/.opencode" => Sandbox.MountInfo(state.opencode_home_dir, Sandbox.MountType.ReadWrite),
+        "/root/.codex" => Sandbox.MountInfo(state.codex_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.gitconfig" => Sandbox.MountInfo(joinpath(state.tools_prefix, "gitconfig"), Sandbox.MountType.ReadWrite),
         "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite),
         "/root/.local" => Sandbox.MountInfo(state.local_dir, Sandbox.MountType.ReadWrite)
@@ -944,6 +1051,26 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         end
     end
 
+    # Map external .opencode directory if it exists (overrides the sandbox opencode directory)
+    # Only mount when actually using OpenCode
+    if state.use_opencode
+        external_opencode_dir = expanduser("~/.opencode")
+        if isdir(external_opencode_dir)
+            mounts["/root/.opencode"] = Sandbox.MountInfo(external_opencode_dir, Sandbox.MountType.ReadWrite)
+            cprintln(CYAN, "📁 Mounting external OpenCode configuration: $external_opencode_dir")
+        end
+    end
+
+    # Map external .codex directory if it exists (overrides the sandbox codex directory)
+    # Only mount when actually using Codex
+    if state.use_codex
+        external_codex_dir = expanduser("~/.codex")
+        if isdir(external_codex_dir)
+            mounts["/root/.codex"] = Sandbox.MountInfo(external_codex_dir, Sandbox.MountType.ReadWrite)
+            cprintln(CYAN, "📁 Mounting external Codex configuration: $external_codex_dir")
+        end
+    end
+
     # Add resolv.conf for DNS resolution if it exists
     if isfile("/etc/resolv.conf")
         resolv_conf_copy = joinpath(state.tools_prefix, "resolv.conf")
@@ -969,6 +1096,8 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "ANTHROPIC_API_KEY" => get(ENV, "ANTHROPIC_API_KEY", ""),
         "GOOGLE_API_KEY" => get(ENV, "GOOGLE_API_KEY", ""),
         "GEMINI_API_KEY" => get(ENV, "GEMINI_API_KEY", ""),
+        "OPENAI_API_KEY" => get(ENV, "OPENAI_API_KEY", ""),
+        "GROQ_API_KEY" => get(ENV, "GROQ_API_KEY", ""),
         "GITHUB_TOKEN" => state.github_token,
         "TERM" => get(ENV, "TERM", "xterm-256color"),
         "TERMINFO" => "/lib/terminfo",
@@ -1033,10 +1162,26 @@ function run_sandbox(state::AppState)
     println("📁 Workspace: $(BOLD)$workspace_mount$(RESET) → $(state.work_dir)")
     println("🚪 Exit with: $(BOLD)exit$(RESET) or $(BOLD)Ctrl+D$(RESET)")
 
-    # Always use bash, but prepare to launch claude/gemini if appropriate
-    cli_installed = state.use_gemini ? state.gemini_installed : state.claude_installed
+    # Always use bash, but prepare to launch claude/gemini/opencode/codex if appropriate
+    cli_installed = if state.use_codex
+        state.codex_installed
+    elseif state.use_opencode
+        state.opencode_installed
+    elseif state.use_gemini
+        state.gemini_installed
+    else
+        state.claude_installed
+    end
     if cli_installed
-        cli_name = state.use_gemini ? "gemini" : "claude"
+        cli_name = if state.use_codex
+            "codex"
+        elseif state.use_opencode
+            "opencode"
+        elseif state.use_gemini
+            "gemini"
+        else
+            "claude"
+        end
         println("\n🤖 Starting $(BOLD)$cli_name$(RESET) interactive session...")
         println("   Type your prompts and $cli_name will respond")
         if state.keep_bash
@@ -1046,7 +1191,13 @@ function run_sandbox(state::AppState)
         end
     else
         println("\n🐚 Starting $(BOLD)bash$(RESET) shell...")
-        if state.use_gemini
+        if state.use_codex
+            println("\n💡 To install codex:")
+            println("   $(BOLD)npm install -g @openai/codex$(RESET)")
+        elseif state.use_opencode
+            println("\n💡 To install opencode:")
+            println("   $(BOLD)curl -fsSL https://opencode.ai/install | bash$(RESET)")
+        elseif state.use_gemini
             println("\n💡 To install gemini:")
             println("   $(BOLD)npm install -g @google/gemini-cli$(RESET)")
         else
@@ -1142,7 +1293,15 @@ alias l='ls -CF'
 """
 
             # Add auto-launch for the selected CLI if installed
-            cli_installed = state.use_gemini ? state.gemini_installed : state.claude_installed
+            cli_installed = if state.use_codex
+                state.codex_installed
+            elseif state.use_opencode
+                state.opencode_installed
+            elseif state.use_gemini
+                state.gemini_installed
+            else
+                state.claude_installed
+            end
             if cli_installed
                 # Use the command builder to create the command
                 cli_cmd = build_cli_command(state; use_full_path=false)
@@ -1151,8 +1310,24 @@ alias l='ls -CF'
                 full_command = Base.shell_escape(cli_cmd)
 
                 # Get cli name and base command for display
-                cli_name = state.use_gemini ? "gemini" : "claude"
-                base_command = state.use_gemini ? cli_name : "$cli_name --dangerously-skip-permissions"
+                cli_name = if state.use_codex
+                    "codex"
+                elseif state.use_opencode
+                    "opencode"
+                elseif state.use_gemini
+                    "gemini"
+                else
+                    "claude"
+                end
+                base_command = if state.use_codex
+                    "$cli_name --full-auto"
+                elseif state.use_opencode
+                    cli_name
+                elseif state.use_gemini
+                    cli_name
+                else
+                    "$cli_name --dangerously-skip-permissions"
+                end
 
                 if state.keep_bash
                     cmd = `$cmd -c "$full_command; echo \"🐚 Returned to bash shell. Run '$base_command' to start $cli_name again.\"; exec /bin/bash --login"`
