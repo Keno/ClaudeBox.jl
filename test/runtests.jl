@@ -2,6 +2,21 @@ using Test
 using ClaudeBox
 using ClaudeBox.Sandbox
 
+# Configure git identity if not already set (needed for BinaryBuilder2 registry creation)
+try
+    run(pipeline(`git config --global user.name`; stdout=devnull, stderr=devnull))
+catch
+    run(`git config --global user.name "Test Runner"`)
+end
+try
+    run(pipeline(`git config --global user.email`; stdout=devnull, stderr=devnull))
+catch
+    run(`git config --global user.email "test@example.com"`)
+end
+
+# Check if running in CI (JULIA_PKGTEST is set by GitHub Actions)
+const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
+
 @testset "ClaudeBox Tests" begin
     @testset "Argument Parsing" begin
         # Test help parsing
@@ -94,6 +109,8 @@ using ClaudeBox.Sandbox
         @test state.codex_home_dir == joinpath(state.claude_prefix, "codex_home")
     end
 
+    # Skip tests requiring full environment setup in CI (requires JuliaHub authentication)
+    if !IS_CI
     @testset "Git Config in Sandbox" begin
         # Create a test state and set up environment
         state = ClaudeBox.initialize_state(pwd())
@@ -516,6 +533,9 @@ using ClaudeBox.Sandbox
 
         println("✓ Command construction logic is correct")
     end
+    else
+        @info "Skipping environment setup tests in CI (requires JuliaHub authentication)"
+    end  # if !IS_CI
 end
 
 println("\nAll tests passed!")
