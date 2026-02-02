@@ -2,18 +2,6 @@ using Test
 using ClaudeBox
 using ClaudeBox.Sandbox
 
-# Configure git identity if not already set (needed for BinaryBuilder2 registry creation)
-try
-    run(pipeline(`git config --global user.name`; stdout=devnull, stderr=devnull))
-catch
-    run(`git config --global user.name "Test Runner"`)
-end
-try
-    run(pipeline(`git config --global user.email`; stdout=devnull, stderr=devnull))
-catch
-    run(`git config --global user.email "test@example.com"`)
-end
-
 # Check if running in CI (JULIA_PKGTEST is set by GitHub Actions)
 const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
 

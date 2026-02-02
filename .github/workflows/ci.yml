@@ -36,7 +36,13 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
-                  
+
+      # Configure git identity (needed for BinaryBuilder2 precompilation)
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
       - uses: julia-actions/julia-buildpkg@v1
         
       - uses: julia-actions/julia-runtest@v1
