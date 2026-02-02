@@ -5,6 +5,10 @@
 *.ji
 compiled/
 
+# Manifest files (Julia version specific)
+Manifest.toml
+**/Manifest.toml
+
 # System files
 .DS_Store
 Thumbs.db
