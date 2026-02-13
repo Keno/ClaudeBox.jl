@@ -514,10 +514,10 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         @test !occursin("--yolo", opencode_str)
         @test !occursin("--full-auto", opencode_str)
 
-        # Codex should have --full-auto
+        # Codex should have --dangerously-bypass-approvals-and-sandbox
         @test !occursin("--dangerously-skip-permissions", codex_str)
         @test !occursin("--yolo", codex_str)
-        @test occursin("--full-auto", codex_str)
+        @test occursin("--dangerously-bypass-approvals-and-sandbox", codex_str)
 
         println("✓ Command construction logic is correct")
     end

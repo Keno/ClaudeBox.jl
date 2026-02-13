@@ -472,8 +472,7 @@ function build_cli_command(state::AppState, extra_args::Vector{String}=String[];
 
     # Build the command using Julia's command syntax
     if state.use_codex
-        # Codex uses --full-auto for auto-approval
-        return `$cli_executable --full-auto $all_args`
+        return `$cli_executable --dangerously-bypass-approvals-and-sandbox $all_args`
     elseif state.use_opencode
         # Opencode auto-approves in non-interactive mode, run as-is
         return `$cli_executable $all_args`
@@ -1320,7 +1319,7 @@ alias l='ls -CF'
                     "claude"
                 end
                 base_command = if state.use_codex
-                    "$cli_name --full-auto"
+                    "$cli_name --dangerously-bypass-approvals-and-sandbox"
                 elseif state.use_opencode
                     cli_name
                 elseif state.use_gemini
