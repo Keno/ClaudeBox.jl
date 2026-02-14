@@ -642,7 +642,7 @@ function install_jll_tool(tool_name::String, jll_name::String, bin_path::String,
         delete!(platform.tags, "julia_version")
 
         artifact_paths = collect_artifact_paths([jll_name]; platform=platform, project_dir=joinpath(dirname(@__DIR__), "tools"))
-        deploy_artifact_paths(install_dir, String[p for p in artifact_paths])
+        deploy_artifact_paths(install_dir, artifact_paths)
 
         # Run post-install hook if provided
         if !isnothing(post_install)

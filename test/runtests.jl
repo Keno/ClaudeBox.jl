@@ -97,6 +97,35 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         @test state.codex_home_dir == joinpath(state.claude_prefix, "codex_home")
     end
 
+    @testset "install_jll_tool artifact path types" begin
+        # Regression test for issue #23: collect_artifact_paths returns a
+        # Dict{PackageSpec, Vector{String}}, which must be passed directly to
+        # deploy_artifact_paths (not converted to Vector{String}).
+        using JLLPrefixes: deploy_artifact_paths
+        # Load Pkg via Base.require since it's already loaded transitively by JLLPrefixes
+        # but may not be directly available in the Pkg.test() sandbox
+        Pkg = Base.require(Base.PkgId(Base.UUID("44cfe95a-1eb2-52ea-b672-e2afdf69b78f"), "Pkg"))
+        PackageSpec = Pkg.Types.PackageSpec
+
+        mktempdir() do dest
+            # Create a mock artifact directory with a test binary
+            artifact_dir = mktempdir()
+            mkpath(joinpath(artifact_dir, "bin"))
+            write(joinpath(artifact_dir, "bin", "test_tool"), "#!/bin/sh\necho test")
+
+            # Simulate the Dict type returned by collect_artifact_paths
+            artifact_paths = Dict{PackageSpec, Vector{String}}(
+                PackageSpec(name="test_jll") => [artifact_dir]
+            )
+
+            # deploy_artifact_paths must accept Dict{PackageSpec, Vector{String}}
+            # The old buggy code did: deploy_artifact_paths(dest, String[p for p in artifact_paths])
+            # which threw MethodError because Pair{PackageSpec, Vector{String}} can't convert to String
+            deploy_artifact_paths(dest, artifact_paths)
+            @test isfile(joinpath(dest, "bin", "test_tool"))
+        end
+    end
+
     # Skip tests requiring full environment setup in CI (requires JuliaHub authentication)
     if !IS_CI
     @testset "Git Config in Sandbox" begin
