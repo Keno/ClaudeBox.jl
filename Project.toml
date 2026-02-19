@@ -44,7 +44,7 @@ ScratchSpaceGarbageCollector = {rev = "main", subdir = "ScratchSpaceGarbageColle
 TreeArchival = {rev = "main", subdir = "TreeArchival.jl", url = "https://github.com/JuliaPackaging/BinaryBuilder2.jl.git"}
 
 [compat]
-BinaryBuilder2 = "2.0.0"
+BinaryBuilder2 = "1.0.0"
 BinaryBuilderAuditor = "0.2.0"
 BinaryBuilderGitUtils = "0.2.0"
 BinaryBuilderPlatformExtensions = "0.2.0"
