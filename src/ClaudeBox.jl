@@ -689,6 +689,20 @@ function bb2_target_spec()
     )
 end
 
+function bb2_i686_target_spec()
+    host_platform = BinaryBuilderToolchains.BBHostPlatform()
+    target_platform = Platform("i686", "linux")
+    platform = BinaryBuilderToolchains.CrossPlatform(host_platform => target_platform)
+
+    return BinaryBuilder2.BuildTargetSpec(
+        "i686",
+        platform,
+        [BinaryBuilderToolchains.CToolchain(;lock_microarchitecture=false)],
+        [],
+        Set{Symbol}()
+    )
+end
+
 function setup_environment!(state::AppState)
     cprint(BLUE, "Setting up environment...")
 
@@ -783,11 +797,13 @@ function setup_environment!(state::AppState)
         cprintln(YELLOW, "  Setting up BB2 toolchain...")
 
         target_spec = bb2_target_spec()
+        i686_spec = bb2_i686_target_spec()
 
-        # Apply toolchains to get sources and environment
+        # Apply both native and i686 cross-compilation toolchains
         env = Dict{String,String}()
         source_trees = Dict{String,Vector{BinaryBuilder2.BinaryBuilderSources.AbstractSource}}()
         env, source_trees = BinaryBuilder2.apply_toolchains(target_spec, env, source_trees)
+        env, source_trees = BinaryBuilder2.apply_toolchains(i686_spec, env, source_trees)
 
         # Deploy toolchain sources
         for (idx, (prefix, sources)) in enumerate(source_trees)
@@ -992,7 +1008,7 @@ esac
     println()
 end
 
-const SANDBOX_PATH = "/root/.local/bin:/root/.opencode/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+const SANDBOX_PATH = "/root/.local/bin:/root/.opencode/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/i686-i686-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
     # Get host platform for debian rootfs
@@ -1112,11 +1128,13 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         # Get toolchain environment from BB2
         # Create the same target spec to get consistent environment
         target_spec = bb2_target_spec()
+        i686_spec = bb2_i686_target_spec()
 
         # Get toolchain environment
         toolchain_env = Dict{String,String}()
         source_trees = Dict{String,Vector{BinaryBuilder2.BinaryBuilderSources.AbstractSource}}()
         env, source_trees = BinaryBuilder2.apply_toolchains(target_spec, env, source_trees)
+        env, source_trees = BinaryBuilder2.apply_toolchains(i686_spec, env, source_trees)
 
         for (idx, (prefix, srcs)) in enumerate(source_trees)
             # Strip leading slashes so that `joinpath()` works as expected,
@@ -1142,7 +1160,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         stdout = stdout,
         stderr = stderr,
         verbose = false,
-        multiarch = [host_platform]
+        multiarch = [host_platform, Platform("i686", "linux")]
     )
 end
 
@@ -1343,6 +1361,8 @@ EOF"`)
         # NOTE: Be careful - if this goes into bashrc, claude may rerun it while node.js is running. cp overrides the file in-place, so if this is done while
         # node is running, it'll fail with SIGBUS.
         run(exe, config, `/bin/sh -c "cp /opt/bb2-x86_64-linux-gnu/gcc/x86_64-linux-gnu/lib64/libstdc++.so.6 /lib/x86_64-linux-gnu/; cp /opt/bb2-x86_64-linux-gnu/gcc/x86_64-linux-gnu/lib64/libatomic.so.1 /lib/x86_64-linux-gnu/"`)
+        # Install i686 runtime libraries
+        run(exe, config, `/bin/sh -c "mkdir -p /lib/i386-linux-gnu && cp /opt/i686-i686-linux-gnu/gcc/i686-linux-gnu/lib/libstdc++.so.6 /lib/i386-linux-gnu/ && cp /opt/i686-i686-linux-gnu/gcc/i686-linux-gnu/lib/libatomic.so.1 /lib/i386-linux-gnu/"`)
 
         run(exe, interactive_config, cmd)
     end
