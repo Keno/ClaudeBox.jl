@@ -793,20 +793,29 @@ function setup_environment!(state::AppState)
     end
 
     # Set up BinaryBuilder2 toolchain
-    if isempty(readdir(joinpath(state.toolchain_dir)))
+    # Compute expected toolchain paths first, then check if all exist
+    target_spec = bb2_target_spec()
+    i686_spec = bb2_i686_target_spec()
+    tc_env = Dict{String,String}()
+    tc_source_trees = Dict{String,Vector{BinaryBuilder2.BinaryBuilderSources.AbstractSource}}()
+    tc_env, tc_source_trees = BinaryBuilder2.apply_toolchains(target_spec, tc_env, tc_source_trees)
+    tc_env, tc_source_trees = BinaryBuilder2.apply_toolchains(i686_spec, tc_env, tc_source_trees)
+
+    sorted_trees = sort(collect(tc_source_trees))
+    all_deployed = !isempty(sorted_trees) && all(enumerate(sorted_trees)) do (idx, (prefix, _))
+        !startswith(prefix, "/opt/") ||
+            isdir(joinpath(state.toolchain_dir, string(idx, "-", lstrip(prefix, '/'))))
+    end
+
+    if !all_deployed
         cprintln(YELLOW, "  Setting up BB2 toolchain...")
 
-        target_spec = bb2_target_spec()
-        i686_spec = bb2_i686_target_spec()
-
-        # Apply both native and i686 cross-compilation toolchains
-        env = Dict{String,String}()
-        source_trees = Dict{String,Vector{BinaryBuilder2.BinaryBuilderSources.AbstractSource}}()
-        env, source_trees = BinaryBuilder2.apply_toolchains(target_spec, env, source_trees)
-        env, source_trees = BinaryBuilder2.apply_toolchains(i686_spec, env, source_trees)
+        # Clear potentially stale toolchain directory
+        rm(state.toolchain_dir; recursive=true, force=true)
+        mkpath(state.toolchain_dir)
 
         # Deploy toolchain sources
-        for (idx, (prefix, sources)) in enumerate(source_trees)
+        for (idx, (prefix, sources)) in enumerate(sorted_trees)
             if startswith(prefix, "/opt/")
                 deploy_path = joinpath(state.toolchain_dir, string(idx, "-", lstrip(prefix, '/')))
 
@@ -1136,7 +1145,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         env, source_trees = BinaryBuilder2.apply_toolchains(target_spec, env, source_trees)
         env, source_trees = BinaryBuilder2.apply_toolchains(i686_spec, env, source_trees)
 
-        for (idx, (prefix, srcs)) in enumerate(source_trees)
+        for (idx, (prefix, srcs)) in enumerate(sort(collect(source_trees)))
             # Strip leading slashes so that `joinpath()` works as expected,
             # prefix with `idx` so that we can overlay multiple disparate folders
             # onto eachother in the sandbox, without clobbering each directory on
