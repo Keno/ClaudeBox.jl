@@ -801,7 +801,7 @@ function setup_environment!(state::AppState)
     tc_env, tc_source_trees = BinaryBuilder2.apply_toolchains(target_spec, tc_env, tc_source_trees)
     tc_env, tc_source_trees = BinaryBuilder2.apply_toolchains(i686_spec, tc_env, tc_source_trees)
 
-    sorted_trees = sort(collect(tc_source_trees))
+    sorted_trees = sort(collect(tc_source_trees); by=first)
     all_deployed = !isempty(sorted_trees) && all(enumerate(sorted_trees)) do (idx, (prefix, _))
         !startswith(prefix, "/opt/") ||
             isdir(joinpath(state.toolchain_dir, string(idx, "-", lstrip(prefix, '/'))))
@@ -1145,7 +1145,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         env, source_trees = BinaryBuilder2.apply_toolchains(target_spec, env, source_trees)
         env, source_trees = BinaryBuilder2.apply_toolchains(i686_spec, env, source_trees)
 
-        for (idx, (prefix, srcs)) in enumerate(sort(collect(source_trees)))
+        for (idx, (prefix, srcs)) in enumerate(sort(collect(source_trees); by=first))
             # Strip leading slashes so that `joinpath()` works as expected,
             # prefix with `idx` so that we can overlay multiple disparate folders
             # onto eachother in the sandbox, without clobbering each directory on
