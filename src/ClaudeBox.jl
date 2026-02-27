@@ -721,6 +721,13 @@ function setup_environment!(state::AppState)
         write(claude_json_path, "{}")
     end
 
+    # Create claude settings.json with sane defaults if it doesn't exist
+    # By default, disable automatic transcript deletion (cf. https://github.com/anthropics/claude-code/issues/4172)
+    claude_settings_path = joinpath(state.claude_home_dir, "settings.json")
+    if !isfile(claude_settings_path)
+        write(claude_settings_path, """{"cleanupPeriodDays": 99999}""")
+    end
+
 
     # Create a global gitconfig with SSL settings and user info
     gitconfig_path = joinpath(state.tools_prefix, "gitconfig")
