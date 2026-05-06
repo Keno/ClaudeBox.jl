@@ -685,6 +685,7 @@ function bb2_target_spec()
         platform,
         [BinaryBuilderToolchains.CToolchain(;lock_microarchitecture=false), HostToolsToolchain()],  # Use default CToolchain
         [],  # No additional dependencies
+        [],  # No build-time dependencies
         Set([:host, :default])
     )
 end
@@ -698,7 +699,8 @@ function bb2_i686_target_spec()
         "i686",
         platform,
         [BinaryBuilderToolchains.CToolchain(;lock_microarchitecture=false)],
-        [],
+        [],  # No additional dependencies
+        [],  # No build-time dependencies
         Set{Symbol}()
     )
 end
