@@ -8,3 +8,6 @@ juliaup_jll = "038fdbe3-3777-5af9-9568-3738956aeb97"
 less_jll = "80e8a3d7-96cb-5b92-b346-c3bbc7c9cf8e"
 procps_jll = "067cb88e-f685-5f7b-ae80-0aaea8472f72"
 ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
+
+[compat]
+CURL_jll = "8.17"
