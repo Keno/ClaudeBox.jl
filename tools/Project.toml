@@ -11,3 +11,4 @@ ripgrep_jll = "e10fc14b-37cd-5cbc-b289-ad01b12ebaad"
 
 [compat]
 CURL_jll = "8.17"
+gh_cli_jll = "2.83"
