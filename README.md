@@ -20,6 +20,7 @@ A Julia application that runs claude-code in an isolated sandbox environment usi
 - 💾 **Persistent Storage**: JLL prefixes and npm packages are stored in scratch spaces
 - 🚀 **Automatic Setup**: Automatically installs Node.js and claude-code
 - 🖥️ **Interactive Session**: Full stdin/stdout/stderr support for interactive commands
+- 🔑 **In-session GitHub token refresh**: The host keeps GitHub tokens fresh for long-running sandbox sessions
 
 ## Installation
 
@@ -127,6 +128,18 @@ To use this feature:
 1. Create a repository named `.claude_sandbox` in your GitHub account
 2. Add a `CLAUDE_SANDBOX.md` file with your custom instructions
 3. ClaudeBox will automatically detect and use it
+
+## GitHub Token Refresh
+
+GitHub OAuth access tokens expire after a few hours, which can interrupt long
+sessions. ClaudeBox keeps the long-lived refresh token on the host, refreshes
+the access token before it expires, and writes only the current access token to
+a small read-only file mounted into the sandbox.
+
+The sandbox's `git` credential helper and `gh` wrapper read that token file each
+time they run, so token renewal is transparent during long sessions. This is
+wired up automatically whenever GitHub authentication is active; no
+configuration is required. The refresh token never enters the sandbox.
 
 ## How It Works
 

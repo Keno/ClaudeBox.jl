@@ -126,6 +126,55 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         end
     end
 
+    @testset "GitHub Token Refresh" begin
+        using JSON
+
+        mktempdir() do dir
+            state = ClaudeBox.initialize_state(pwd())
+            state.tools_prefix = joinpath(dir, "tools")
+            state.build_tools_dir = joinpath(state.tools_prefix, "build_tools")
+            mkpath(state.build_tools_dir)
+            state.github_token = "test-token"
+            state.github_refresh_token = "test-refresh-token"
+            state.github_token_expires_at = time() + 3600
+
+            @test ClaudeBox.has_github_refresh_token(state)
+            @test ClaudeBox.seconds_until_github_token_refresh(state) > 3000
+
+            ClaudeBox.write_sandbox_github_token(state)
+            token_file = ClaudeBox.github_token_file(state)
+            @test isfile(token_file)
+            @test read(token_file, String) == "test-token"
+            @test (filemode(token_file) & 0o077) == 0
+
+            token_dir = joinpath(dir, "tokens")
+            ClaudeBox.save_github_tokens(token_dir, "access", "refresh", false; expires_at=1234.5)
+            tokens = ClaudeBox.load_github_tokens(token_dir)
+            @test tokens.access_token == "access"
+            @test tokens.refresh_token == "refresh"
+            @test tokens.expires_at == 1234.5
+
+            ClaudeBox.write_github_auth_helpers!(state)
+            credential_helper = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
+            gh_wrapper = joinpath(state.build_tools_dir, "bin", "gh")
+            @test isfile(credential_helper)
+            @test isfile(gh_wrapper)
+            @test (filemode(credential_helper) & 0o111) != 0
+            @test (filemode(gh_wrapper) & 0o111) != 0
+
+            credential_content = read(credential_helper, String)
+            @test occursin(ClaudeBox.SANDBOX_GITHUB_TOKEN_FILE, credential_content)
+            @test occursin("GITHUB_TOKEN", credential_content)
+
+            wrapper_content = read(gh_wrapper, String)
+            @test occursin(ClaudeBox.SANDBOX_GITHUB_TOKEN_FILE, wrapper_content)
+            @test occursin("exec /opt/gh_cli/bin/gh", wrapper_content)
+
+            cmd = string(ClaudeBox.build_cli_command(state))
+            @test !occursin("--mcp-config", cmd)
+        end
+    end
+
     # Skip tests requiring full environment setup in CI (requires JuliaHub authentication)
     if !IS_CI
     @testset "Git Config in Sandbox" begin
