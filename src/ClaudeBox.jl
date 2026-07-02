@@ -30,7 +30,6 @@ const JULIA_DEPOT_SCRATCH_KEY = "claude_code_sandbox_julia_depot"
 const VERSION = "1.0.0"
 
 # Helper functions for colored output
-cprint(color, text) = print(color, text, RESET)
 cprintln(color, text) = println(color, text, RESET)
 
 # Check if a path exists without following symlinks (useful for symlinks with
@@ -633,18 +632,29 @@ Install a JLL tool if it's not already installed.
 - `post_install`: Optional function to run after installation
 """
 function install_jll_tool(tool_name::String, jll_name::String, bin_path::String, install_dir::String; post_install=nothing)
-    if !isfile(bin_path)
+    platform = Base.BinaryPlatforms.HostPlatform()
+    platform["target_libc"] = "glibc"
+    platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
+    delete!(platform.tags, "julia_version")
+
+    artifact_paths = collect_artifact_paths([jll_name]; platform=platform, project_dir=joinpath(dirname(@__DIR__), "tools"))
+    version_marker = joinpath(install_dir, ".artifact_version")
+    artifact_fingerprint = join(sort(artifact_paths), "\n")
+
+    needs_install = !isfile(bin_path) || !isfile(version_marker)
+    if !needs_install
+        needs_install = read(version_marker, String) != artifact_fingerprint
+    end
+
+    if needs_install
         cprintln(YELLOW, "  Installing $tool_name...")
-        # Create platform with glibc target and host arch
-        platform = Base.BinaryPlatforms.HostPlatform()
-        platform["target_libc"] = "glibc"
-        platform["target_arch"] = string(Base.BinaryPlatforms.arch(platform))
-        delete!(platform.tags, "julia_version")
-
-        artifact_paths = collect_artifact_paths([jll_name]; platform=platform, project_dir=joinpath(dirname(@__DIR__), "tools"))
+        if isdir(install_dir)
+            rm(install_dir; recursive=true, force=true)
+        end
+        mkpath(install_dir)
         deploy_artifact_paths(install_dir, artifact_paths)
+        write(version_marker, artifact_fingerprint)
 
-        # Run post-install hook if provided
         if !isnothing(post_install)
             post_install()
         end
@@ -706,7 +716,7 @@ function bb2_i686_target_spec()
 end
 
 function setup_environment!(state::AppState)
-    cprint(BLUE, "Setting up environment...")
+    cprintln(BLUE, "Setting up environment...")
 
     # Create directories
     mkpath(state.nodejs_dir)
