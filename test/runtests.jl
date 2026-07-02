@@ -50,6 +50,17 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         # Test codex default is false
         options = ClaudeBox.parse_args(String[])
         @test options["codex"] == false
+
+        # Test profile parsing
+        options = ClaudeBox.parse_args(String["--profile", "work"])
+        @test options["profile"] == "work"
+
+        options = ClaudeBox.parse_args(String["--profile=personal"])
+        @test options["profile"] == "personal"
+
+        # Test profile default is unset
+        options = ClaudeBox.parse_args(String[])
+        @test isnothing(options["profile"])
     end
 
     @testset "State Initialization" begin
@@ -63,6 +74,9 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         @test state.use_gemini == false
         @test state.use_opencode == false
         @test state.use_codex == false
+        @test isnothing(state.claude_profile)
+        @test state.claude_home_dir == joinpath(state.claude_prefix, "claude_home")
+        @test state.claude_json_path == joinpath(state.claude_prefix, "claude.json")
 
         # Test state creation with gemini flag
         state_gemini = ClaudeBox.initialize_state(pwd(), String[], false, false, true, false, false)
@@ -95,6 +109,29 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         # Test codex_home_dir is created
         @test isdir(state.codex_home_dir)
         @test state.codex_home_dir == joinpath(state.claude_prefix, "codex_home")
+
+        # Test Claude Code profile separates login/settings paths but not history.
+        state_profile = ClaudeBox.initialize_state(pwd(), String[], false, false, false, false, false, false, "work")
+        @test state_profile.claude_profile == "work"
+        @test state_profile.claude_home_dir == joinpath(state_profile.claude_prefix, "profiles", "work", "claude_home")
+        @test state_profile.claude_json_path == joinpath(state_profile.claude_prefix, "profiles", "work", "claude.json")
+        @test state_profile.local_dir == state.local_dir
+        @test ClaudeBox.claude_project_history_dir(state_profile.work_dir) == ClaudeBox.claude_project_history_dir(state.work_dir)
+        @test ClaudeBox.claude_project_mount_path("/workspace") == "/root/.claude/projects/-workspace"
+
+        # Test Codex history is separated by workspace under the selected Codex root.
+        @test ClaudeBox.codex_workspace_history_name("/tmp/my-project") == "-tmp-my-project"
+        mktempdir() do codex_root
+            mounts = Dict{String,Sandbox.MountInfo}()
+            history_dir = ClaudeBox.add_codex_workspace_history_mounts!(mounts, codex_root, "/tmp/my-project")
+            @test history_dir == joinpath(codex_root, "workspace_history", "-tmp-my-project")
+            @test isfile(joinpath(history_dir, "history.jsonl"))
+            @test isdir(joinpath(history_dir, "sessions"))
+            @test isdir(joinpath(history_dir, "shell_snapshots"))
+            @test mounts["/root/.codex/history.jsonl"].host_path == joinpath(history_dir, "history.jsonl")
+            @test mounts["/root/.codex/sessions"].host_path == joinpath(history_dir, "sessions")
+            @test mounts["/root/.codex/shell_snapshots"].host_path == joinpath(history_dir, "shell_snapshots")
+        end
     end
 
     @testset "install_jll_tool artifact path types" begin
@@ -123,6 +160,55 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
             # which threw MethodError because Pair{PackageSpec, Vector{String}} can't convert to String
             deploy_artifact_paths(dest, artifact_paths)
             @test isfile(joinpath(dest, "bin", "test_tool"))
+        end
+    end
+
+    @testset "GitHub Token Refresh" begin
+        using JSON
+
+        mktempdir() do dir
+            state = ClaudeBox.initialize_state(pwd())
+            state.tools_prefix = joinpath(dir, "tools")
+            state.build_tools_dir = joinpath(state.tools_prefix, "build_tools")
+            mkpath(state.build_tools_dir)
+            state.github_token = "test-token"
+            state.github_refresh_token = "test-refresh-token"
+            state.github_token_expires_at = time() + 3600
+
+            @test ClaudeBox.has_github_refresh_token(state)
+            @test ClaudeBox.seconds_until_github_token_refresh(state) > 3000
+
+            ClaudeBox.write_sandbox_github_token(state)
+            token_file = ClaudeBox.github_token_file(state)
+            @test isfile(token_file)
+            @test read(token_file, String) == "test-token"
+            @test (filemode(token_file) & 0o077) == 0
+
+            token_dir = joinpath(dir, "tokens")
+            ClaudeBox.save_github_tokens(token_dir, "access", "refresh", false; expires_at=1234.5)
+            tokens = ClaudeBox.load_github_tokens(token_dir)
+            @test tokens.access_token == "access"
+            @test tokens.refresh_token == "refresh"
+            @test tokens.expires_at == 1234.5
+
+            ClaudeBox.write_github_auth_helpers!(state)
+            credential_helper = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
+            gh_wrapper = joinpath(state.build_tools_dir, "bin", "gh")
+            @test isfile(credential_helper)
+            @test isfile(gh_wrapper)
+            @test (filemode(credential_helper) & 0o111) != 0
+            @test (filemode(gh_wrapper) & 0o111) != 0
+
+            credential_content = read(credential_helper, String)
+            @test occursin(ClaudeBox.SANDBOX_GITHUB_TOKEN_FILE, credential_content)
+            @test occursin("GITHUB_TOKEN", credential_content)
+
+            wrapper_content = read(gh_wrapper, String)
+            @test occursin(ClaudeBox.SANDBOX_GITHUB_TOKEN_FILE, wrapper_content)
+            @test occursin("exec /opt/gh_cli/bin/gh", wrapper_content)
+
+            cmd = string(ClaudeBox.build_cli_command(state))
+            @test !occursin("--mcp-config", cmd)
         end
     end
 
@@ -282,6 +368,12 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
             # Otherwise, should use the sandbox codex_home_dir
             @test mounts_codex["/root/.codex"].host_path == state_codex.codex_home_dir
         end
+
+        codex_root = mounts_codex["/root/.codex"].host_path
+        codex_history_dir = ClaudeBox.codex_workspace_history_dir(codex_root, state_codex.work_dir)
+        @test mounts_codex["/root/.codex/history.jsonl"].host_path == joinpath(codex_history_dir, "history.jsonl")
+        @test mounts_codex["/root/.codex/sessions"].host_path == joinpath(codex_history_dir, "sessions")
+        @test mounts_codex["/root/.codex/shell_snapshots"].host_path == joinpath(codex_history_dir, "shell_snapshots")
 
         # Test with claude mode (codex disabled)
         state_claude = ClaudeBox.initialize_state(pwd(), String[], false, false, false, false, false)  # use_codex = false

@@ -28,6 +28,9 @@ const TOOLS_SCRATCH_KEY = "claude_code_sandbox_tools"
 const CLAUDE_SCRATCH_KEY = "claude_code_sandbox_settings"
 const JULIA_DEPOT_SCRATCH_KEY = "claude_code_sandbox_julia_depot"
 const VERSION = "1.0.0"
+const SANDBOX_GITHUB_AUTH_DIR = "/run/claudebox-github"
+const SANDBOX_GITHUB_TOKEN_FILE = "$SANDBOX_GITHUB_AUTH_DIR/token"
+const GITHUB_TOKEN_REFRESH_SKEW_SECONDS = 5 * 60
 
 # Helper functions for colored output
 cprintln(color, text) = println(color, text, RESET)
@@ -49,7 +52,9 @@ mutable struct AppState
     toolchain_dir::String
     juliaup_dir::String
     julia_dir::String
+    claude_profile::Union{String, Nothing}
     claude_home_dir::String
+    claude_json_path::String
     gemini_home_dir::String
     opencode_home_dir::String
     codex_home_dir::String
@@ -61,6 +66,7 @@ mutable struct AppState
     codex_installed::Bool
     github_token::String
     github_refresh_token::Union{String, Nothing}
+    github_token_expires_at::Union{Float64, Nothing}
     claude_args::Vector{String}
     keep_bash::Bool
     claude_sandbox_dir::Union{String, Nothing}
@@ -139,37 +145,35 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"], options["profile"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
-        # Check if existing token is valid
-        if !isempty(state.github_token)
+        # The refresh token stays on the host. When available, renew the access
+        # token immediately so the sandbox starts with a fresh token and a known
+        # expiry time.
+        if has_github_refresh_token(state)
+            cprintln(YELLOW, "Refreshing GitHub token...")
+            if refresh_github_token!(state; verbose=true)
+                cprintln(GREEN, "✓ GitHub token refreshed successfully")
+            elseif !isempty(state.github_token) && GitHubAuth.validate_token(state.github_token; silent=true)
+                cprintln(YELLOW, "⚠ Failed to refresh GitHub token; using existing valid token")
+                write_sandbox_github_token(state)
+            else
+                cprintln(YELLOW, "Failed to refresh token, requesting new authentication...")
+                state.github_token = ""
+                state.github_refresh_token = nothing
+                state.github_token_expires_at = nothing
+            end
+        elseif !isempty(state.github_token)
             if GitHubAuth.validate_token(state.github_token; silent=true)
                 cprintln(GREEN, "✓ Using existing valid GitHub token")
+                write_sandbox_github_token(state)
             else
-                # Try to refresh the token if we have a refresh token
-                if !isnothing(state.github_refresh_token) && !isempty(state.github_refresh_token)
-                    cprintln(YELLOW, "Access token expired, attempting to refresh...")
-                    refresh_response = GitHubAuth.refresh_access_token(state.github_refresh_token; dangerous_mode=state.dangerous_github_auth)
-                    if !isnothing(refresh_response)
-                        state.github_token = refresh_response.access_token
-                        state.github_refresh_token = refresh_response.refresh_token
-                        save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token, state.dangerous_github_auth)
-                        filename = state.dangerous_github_auth ? "github_tokens_dangerous.json" : "github_tokens.json"
-                        token_path = joinpath(state.claude_prefix, filename)
-                        cprintln(GREEN, "✓ GitHub token refreshed successfully")
-                        cprintln(CYAN, "   Token location: $(token_path)")
-                    else
-                        cprintln(YELLOW, "Failed to refresh token, requesting new authentication...")
-                        state.github_token = ""
-                        state.github_refresh_token = nothing
-                    end
-                else
-                    cprintln(YELLOW, "Existing GitHub token is invalid, requesting new authentication...")
-                    state.github_token = ""
-                    state.github_refresh_token = nothing
-                end
+                cprintln(YELLOW, "Existing GitHub token is invalid, requesting new authentication...")
+                state.github_token = ""
+                state.github_refresh_token = nothing
+                state.github_token_expires_at = nothing
             end
         end
 
@@ -194,9 +198,7 @@ function _main(args::Vector{String})::Cint
             auth_task = @task try
                 token_response = GitHubAuth.authenticate(dangerous_mode=state.dangerous_github_auth)
                 if GitHubAuth.validate_token(token_response.access_token)
-                    state.github_token = token_response.access_token
-                    state.github_refresh_token = token_response.refresh_token
-                    save_github_tokens(state.claude_prefix, state.github_token, state.github_refresh_token, state.dangerous_github_auth)
+                    store_github_token_response!(state, token_response)
                     filename = state.dangerous_github_auth ? "github_tokens_dangerous.json" : "github_tokens.json"
                     token_path = joinpath(state.claude_prefix, filename)
                     cprintln(GREEN, "✓ GitHub authenticated and token saved")
@@ -236,6 +238,9 @@ function _main(args::Vector{String})::Cint
         handle_claude_sandbox_repo!(state)
     end
 
+    # Keep a reference to the host refresh task while run_sandbox blocks.
+    github_refresh_task = options["no_github_auth"] ? nothing : start_github_token_refresh_task!(state)
+
     # Create and run sandbox
     run_sandbox(state)
 
@@ -258,6 +263,7 @@ function parse_args(args::Vector{String})
         "opencode" => false,
         "codex" => false,
         "preserve" => false,
+        "profile" => nothing,
         "claude_args" => String[]
     )
 
@@ -288,6 +294,16 @@ function parse_args(args::Vector{String})
             options["codex"] = true
         elseif arg == "--preserve"
             options["preserve"] = true
+        elseif arg == "--profile"
+            if i < length(args)
+                i += 1
+                options["profile"] = validate_profile_name(args[i])
+            else
+                cprintln(RED, "Error: --profile requires an argument")
+                exit(1)
+            end
+        elseif startswith(arg, "--profile=")
+            options["profile"] = validate_profile_name(arg[length("--profile=")+1:end])
         elseif arg in ["--work-dir", "-w"]
             if i < length(args)
                 i += 1
@@ -316,6 +332,14 @@ function parse_args(args::Vector{String})
     return options
 end
 
+function validate_profile_name(profile::AbstractString)
+    if isempty(profile) || profile in (".", "..") || !occursin(r"^[A-Za-z0-9._-]+$", profile)
+        cprintln(RED, "Error: --profile must contain only letters, numbers, '.', '_', or '-'")
+        exit(1)
+    end
+    return profile
+end
+
 function print_banner()
     println()
     cprintln(CYAN, "╔════════════════════════════════════════════════╗")
@@ -336,6 +360,7 @@ function print_help()
         -v, --version       Show version information
         -w, --work-dir DIR  Directory to mount as /workspace (default: current)
         --preserve          Mount directory at same path as parent instead of /workspace
+        --profile NAME      Separate Claude Code login/settings under a named profile
         --reset             Reset tools (Node.js, npm, git, gh) but keep Claude settings
         --reset-all         Reset everything including Claude settings
         --reset-julia       Reset Julia depot only (packages and registries)
@@ -381,7 +406,11 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false, claude_profile::Union{String, Nothing}=nothing)::AppState
+    if !isnothing(claude_profile)
+        claude_profile = validate_profile_name(claude_profile)
+    end
+
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
     julia_depot_prefix = @get_scratch!(JULIA_DEPOT_SCRATCH_KEY)
@@ -393,7 +422,9 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     toolchain_dir = joinpath(tools_prefix, "toolchain")
     juliaup_dir = joinpath(tools_prefix, "juliaup")
     julia_dir = joinpath(julia_depot_prefix, "depot")
-    claude_home_dir = joinpath(claude_prefix, "claude_home")
+    claude_profile_dir = isnothing(claude_profile) ? claude_prefix : joinpath(claude_prefix, "profiles", claude_profile)
+    claude_home_dir = joinpath(claude_profile_dir, "claude_home")
+    claude_json_path = joinpath(claude_profile_dir, "claude.json")
     gemini_home_dir = joinpath(claude_prefix, "gemini_home")
     opencode_home_dir = joinpath(claude_prefix, "opencode_home")
     codex_home_dir = joinpath(claude_prefix, "codex_home")
@@ -430,7 +461,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_profile, claude_home_dir, claude_json_path, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, tokens.expires_at, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path)
 end
 
 """
@@ -568,10 +599,138 @@ function handle_claude_sandbox_repo!(state::AppState)
     state.claude_sandbox_dir = sandbox_repo_dir
 end
 
-function save_github_tokens(claude_prefix::String, access_token::String, refresh_token::Union{String, Nothing}=nothing, dangerous_mode::Bool=false)
+github_auth_dir(state::AppState) = joinpath(state.tools_prefix, "github_auth")
+github_token_file(state::AppState) = joinpath(github_auth_dir(state), "token")
+
+has_github_refresh_token(state::AppState) =
+    !isnothing(state.github_refresh_token) && !isempty(something(state.github_refresh_token, ""))
+
+function github_token_expires_at(expires_in::Union{Integer, Nothing})
+    return isnothing(expires_in) ? nothing : time() + Float64(expires_in)
+end
+
+function store_github_token_response!(state::AppState, response::GitHubAuth.AccessTokenResponse)
+    state.github_token = response.access_token
+    state.github_refresh_token = response.refresh_token
+    state.github_token_expires_at = github_token_expires_at(response.expires_in)
+    save_github_tokens(
+        state.claude_prefix,
+        state.github_token,
+        state.github_refresh_token,
+        state.dangerous_github_auth;
+        expires_at=state.github_token_expires_at)
+    write_sandbox_github_token(state)
+    return nothing
+end
+
+function write_sandbox_github_token(state::AppState)
+    token_file = github_token_file(state)
+    mkpath(dirname(token_file))
+    if isempty(state.github_token)
+        rm(token_file; force=true)
+    else
+        tmp = tempname(dirname(token_file))
+        write(tmp, state.github_token)
+        chmod(tmp, 0o600)
+        mv(tmp, token_file; force=true)
+    end
+    return nothing
+end
+
+function refresh_github_token!(state::AppState; verbose::Bool=false)
+    has_github_refresh_token(state) || return false
+
+    refresh_response = GitHubAuth.refresh_access_token(
+        state.github_refresh_token;
+        dangerous_mode=state.dangerous_github_auth)
+    if isnothing(refresh_response)
+        return false
+    end
+
+    store_github_token_response!(state, refresh_response)
+    if verbose
+        filename = state.dangerous_github_auth ? "github_tokens_dangerous.json" : "github_tokens.json"
+        cprintln(CYAN, "   Token location: $(joinpath(state.claude_prefix, filename))")
+    end
+    return true
+end
+
+function seconds_until_github_token_refresh(state::AppState)
+    if isnothing(state.github_token_expires_at)
+        return 55 * 60.0
+    end
+    return max(state.github_token_expires_at - time() - GITHUB_TOKEN_REFRESH_SKEW_SECONDS, 1.0)
+end
+
+function start_github_token_refresh_task!(state::AppState)
+    has_github_refresh_token(state) || return nothing
+    write_sandbox_github_token(state)
+
+    return @async begin
+        while has_github_refresh_token(state)
+            sleep(seconds_until_github_token_refresh(state))
+            if !refresh_github_token!(state)
+                @warn "ClaudeBox: failed to refresh GitHub token; will retry" token_file=github_token_file(state)
+                sleep(5 * 60)
+            end
+        end
+    end
+end
+
+function write_github_auth_helpers!(state::AppState)
+    # Create a credential helper script in build_tools (after build tools are installed)
+    credential_helper_path = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
+    mkpath(dirname(credential_helper_path))
+    write(credential_helper_path, """
+#!/bin/sh
+# Git credential helper. Prefers the ClaudeBox-managed token refreshed by the
+# host, falling back to the current environment and then the GitHub CLI.
+
+case "\$1" in
+    get)
+        token=""
+        if [ -s $SANDBOX_GITHUB_TOKEN_FILE ]; then
+            token="\$(cat $SANDBOX_GITHUB_TOKEN_FILE 2>/dev/null)"
+        fi
+        if [ -z "\$token" ] && [ -n "\$GITHUB_TOKEN" ]; then
+            token="\$GITHUB_TOKEN"
+        fi
+        if [ -z "\$token" ]; then
+            token="\$(gh auth token 2>/dev/null)"
+        fi
+        echo "username=x-access-token"
+        echo "password=\$token"
+        ;;
+    store|erase)
+        # Ignore store and erase operations
+        exit 0
+        ;;
+esac
+""")
+    chmod(credential_helper_path, 0o755)
+
+    gh_wrapper_path = joinpath(state.build_tools_dir, "bin", "gh")
+    write(gh_wrapper_path, """
+#!/bin/sh
+# Keep gh using the latest host-refreshed token.
+if [ -s $SANDBOX_GITHUB_TOKEN_FILE ]; then
+    token="\$(cat $SANDBOX_GITHUB_TOKEN_FILE 2>/dev/null)"
+    if [ -n "\$token" ]; then
+        export GITHUB_TOKEN="\$token"
+        export GH_TOKEN="\$token"
+    fi
+fi
+exec /opt/gh_cli/bin/gh "\$@"
+""")
+    chmod(gh_wrapper_path, 0o755)
+    return nothing
+end
+
+function save_github_tokens(claude_prefix::String, access_token::String, refresh_token::Union{String, Nothing}=nothing, dangerous_mode::Bool=false; expires_at::Union{Real, Nothing}=nothing)
     # Use different files for normal vs dangerous mode
     filename = dangerous_mode ? "github_tokens_dangerous.json" : "github_tokens.json"
     token_file = joinpath(claude_prefix, filename)
+    mkpath(claude_prefix)
 
     # Load existing tokens to preserve both sets
     all_tokens = Dict{String, Any}()
@@ -591,7 +750,8 @@ function save_github_tokens(claude_prefix::String, access_token::String, refresh
     key = dangerous_mode ? "dangerous" : "normal"
     all_tokens[key] = Dict(
         "access_token" => access_token,
-        "refresh_token" => refresh_token
+        "refresh_token" => refresh_token,
+        "expires_at" => expires_at
     )
 
     # Save to the appropriate file
@@ -606,17 +766,19 @@ function load_github_tokens(claude_prefix::String, dangerous_mode::Bool=false)
     if isfile(token_file)
         try
             tokens = JSON.parsefile(token_file)
+            expires_at = get(tokens, "expires_at", nothing)
             return (
                 access_token = get(tokens, "access_token", ""),
-                refresh_token = get(tokens, "refresh_token", nothing)
+                refresh_token = get(tokens, "refresh_token", nothing),
+                expires_at = expires_at isa Number ? Float64(expires_at) : nothing
             )
         catch
             # Invalid JSON file
-            return (access_token = "", refresh_token = nothing)
+            return (access_token = "", refresh_token = nothing, expires_at = nothing)
         end
     end
 
-    return (access_token = "", refresh_token = nothing)
+    return (access_token = "", refresh_token = nothing, expires_at = nothing)
 end
 
 """
@@ -728,9 +890,9 @@ function setup_environment!(state::AppState)
     mkpath(state.claude_home_dir)
 
     # Create claude.json file if it doesn't exist
-    claude_json_path = joinpath(state.claude_prefix, "claude.json")
-    if !isfile(claude_json_path)
-        write(claude_json_path, "{}")
+    mkpath(dirname(state.claude_json_path))
+    if !isfile(state.claude_json_path)
+        write(state.claude_json_path, "{}")
     end
 
     # Create claude settings.json with sane defaults if it doesn't exist
@@ -846,25 +1008,7 @@ function setup_environment!(state::AppState)
         cprintln(GREEN, "  ✓ BB2 toolchain installed")
     end
 
-    # Create a credential helper script in build_tools (after build tools are installed)
-    credential_helper_path = joinpath(state.build_tools_dir, "bin", "git-credential-gh")
-    mkpath(dirname(credential_helper_path))
-    write(credential_helper_path, """
-#!/bin/sh
-# Git credential helper that uses GitHub CLI
-
-case "\$1" in
-    get)
-        echo "username=x-access-token"
-        echo "password=\$(gh auth token 2>/dev/null)"
-        ;;
-    store|erase)
-        # Ignore store and erase operations
-        exit 0
-        ;;
-esac
-""")
-    chmod(credential_helper_path, 0o755)  # Make it executable
+    write_github_auth_helpers!(state)
 
     # Check if juliaup is installed (separate from build tools)
     juliaup_bin = joinpath(state.juliaup_dir, "bin", "juliaup")
@@ -1036,7 +1180,43 @@ esac
     println()
 end
 
-const SANDBOX_PATH = "/root/.local/bin:/root/.opencode/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/gh_cli/bin:/opt/build_tools/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/i686-i686-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+const SANDBOX_PATH = "/root/.local/bin:/root/.opencode/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/build_tools/bin:/opt/gh_cli/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/i686-i686-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+
+claude_project_history_dir(work_dir::AbstractString) =
+    expanduser("~/.claude/projects/$(replace(work_dir, "/" => "-"))")
+
+claude_project_mount_name(workspace_mount::AbstractString) =
+    replace(workspace_mount, "/" => "-")
+
+claude_project_mount_path(workspace_mount::AbstractString) =
+    "/root/.claude/projects/$(claude_project_mount_name(workspace_mount))"
+
+external_codex_dir() = expanduser("~/.codex")
+
+codex_workspace_history_name(work_dir::AbstractString) =
+    replace(work_dir, "/" => "-")
+
+codex_workspace_history_dir(codex_root::AbstractString, work_dir::AbstractString) =
+    joinpath(codex_root, "workspace_history", codex_workspace_history_name(work_dir))
+
+function add_codex_workspace_history_mounts!(mounts::Dict{String, Sandbox.MountInfo}, codex_root::AbstractString, work_dir::AbstractString)
+    workspace_history_dir = codex_workspace_history_dir(codex_root, work_dir)
+    mkpath(workspace_history_dir)
+
+    history_file = joinpath(workspace_history_dir, "history.jsonl")
+    if !isfile(history_file)
+        touch(history_file)
+    end
+    mounts["/root/.codex/history.jsonl"] = Sandbox.MountInfo(history_file, Sandbox.MountType.ReadWrite)
+
+    for history_dirname in ("sessions", "shell_snapshots")
+        host_path = joinpath(workspace_history_dir, history_dirname)
+        mkpath(host_path)
+        mounts["/root/.codex/$history_dirname"] = Sandbox.MountInfo(host_path, Sandbox.MountType.ReadWrite)
+    end
+
+    return workspace_history_dir
+end
 
 function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
     # Get host platform for debian rootfs
@@ -1055,7 +1235,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/opt/juliaup" => Sandbox.MountInfo(state.juliaup_dir, Sandbox.MountType.ReadOnly),
         workspace_mount => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
-        "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
+        "/root/.claude.json" => Sandbox.MountInfo(state.claude_json_path, Sandbox.MountType.ReadWrite),
         "/root/.gemini" => Sandbox.MountInfo(state.gemini_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.opencode" => Sandbox.MountInfo(state.opencode_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.codex" => Sandbox.MountInfo(state.codex_home_dir, Sandbox.MountType.ReadWrite),
@@ -1069,19 +1249,27 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         mounts["/root/.claude_sandbox"] = Sandbox.MountInfo(state.claude_sandbox_dir, Sandbox.MountType.ReadWrite)
     end
 
-    # Map external .claude/projects directory for the current work_dir
-    # Convert work_dir path to claude projects directory name (replace / with -)
-    work_dir_name = replace(state.work_dir, "/" => "-")
-    external_claude_projects = expanduser("~/.claude/projects/$work_dir_name")
+    # Bind-mount the host-refreshed GitHub token file into the sandbox. The
+    # sandbox can read the current access token, but the refresh token remains
+    # only in the host-side ClaudeBox settings.
+    if isfile(github_token_file(state))
+        mounts[SANDBOX_GITHUB_AUTH_DIR] = Sandbox.MountInfo(github_auth_dir(state), Sandbox.MountType.ReadOnly)
+    end
+
+    # Map external .claude/projects directory for the current work_dir. This is
+    # intentionally independent of --profile so Claude Code history remains
+    # shared across work/personal profile splits.
+    external_claude_projects = claude_project_history_dir(state.work_dir)
 
     if !isdir(external_claude_projects)
         mkpath(external_claude_projects)
     end
     # Convert the workspace mount to a project name (replace / with -)
-    projects_mount_name = replace(workspace_mount, "/" => "-")
+    projects_mount_name = claude_project_mount_name(workspace_mount)
+    projects_mount_path = claude_project_mount_path(workspace_mount)
     mkpath(joinpath(state.claude_home_dir, "projects", projects_mount_name))
     # Mount it to the corresponding location inside the sandbox
-    mounts["/root/.claude/projects/$projects_mount_name"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
+    mounts[projects_mount_path] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
     cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
 
     # Map external .gemini directory if it exists (overrides the sandbox gemini directory)
@@ -1107,11 +1295,16 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     # Map external .codex directory if it exists (overrides the sandbox codex directory)
     # Only mount when actually using Codex
     if state.use_codex
-        external_codex_dir = expanduser("~/.codex")
-        if isdir(external_codex_dir)
-            mounts["/root/.codex"] = Sandbox.MountInfo(external_codex_dir, Sandbox.MountType.ReadWrite)
-            cprintln(CYAN, "📁 Mounting external Codex configuration: $external_codex_dir")
+        codex_root = state.codex_home_dir
+        external_codex_config_dir = external_codex_dir()
+        if isdir(external_codex_config_dir)
+            codex_root = external_codex_config_dir
+            mounts["/root/.codex"] = Sandbox.MountInfo(codex_root, Sandbox.MountType.ReadWrite)
+            cprintln(CYAN, "📁 Mounting external Codex configuration: $codex_root")
         end
+
+        codex_history_dir = add_codex_workspace_history_mounts!(mounts, codex_root, state.work_dir)
+        cprintln(CYAN, "📁 Mounting Codex workspace history: $codex_history_dir")
     end
 
     # Add resolv.conf for DNS resolution if it exists
@@ -1205,6 +1398,9 @@ function run_sandbox(state::AppState)
     println()
 
     println("📁 Workspace: $(BOLD)$workspace_mount$(RESET) → $(state.work_dir)")
+    if !isnothing(state.claude_profile)
+        println("👤 Claude profile: $(BOLD)$(state.claude_profile)$(RESET)")
+    end
     println("🚪 Exit with: $(BOLD)exit$(RESET) or $(BOLD)Ctrl+D$(RESET)")
 
     # Always use bash, but prepare to launch claude/gemini/opencode/codex if appropriate
@@ -1273,6 +1469,17 @@ Please check `/root/.claude_sandbox/CLAUDE_SANDBOX.md` for any custom configurat
 """
         end
 
+        github_token_section = ""
+        if isfile(github_token_file(state))
+            github_token_section = """
+
+## GitHub Token Refresh
+
+The host keeps the GitHub access token refreshed and writes the current token to
+`$SANDBOX_GITHUB_TOKEN_FILE`. `git` and `gh` read that file automatically.
+"""
+        end
+
         claude_md_content = """
 # ClaudeBox Sandbox Environment
 
@@ -1310,7 +1517,7 @@ elseif state.dangerous_github_auth
     "- GitHub authenticated with **DANGEROUS** permissions (repository creation, etc.)\n- ⚠️  Use caution with these elevated permissions!"
 else
     "- GitHub authenticated with standard permissions\n- You can use git and gh commands\n- Repository creation and most admin actions are disabled\n- For broader permissions (repo creation, etc.), ask the user to restart with `claudebox --dangerous-github-auth`"
-end)$claude_sandbox_section
+end)$claude_sandbox_section$github_token_section
 
 ## Tips
 
@@ -1330,6 +1537,10 @@ EOF"`)
 # Claude Sandbox environment
 export PS1="\\[\\033[32m\\][sandbox]\\[\\033[0m\\] \\w \\\$ "
 export PATH="$SANDBOX_PATH"
+if [ -s "$SANDBOX_GITHUB_TOKEN_FILE" ]; then
+    export GITHUB_TOKEN="\$(cat "$SANDBOX_GITHUB_TOKEN_FILE" 2>/dev/null)"
+    export GH_TOKEN="\$GITHUB_TOKEN"
+fi
 
 # Helpful aliases
 alias ll='ls -la'
