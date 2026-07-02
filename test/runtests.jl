@@ -50,6 +50,17 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         # Test codex default is false
         options = ClaudeBox.parse_args(String[])
         @test options["codex"] == false
+
+        # Test profile parsing
+        options = ClaudeBox.parse_args(String["--profile", "work"])
+        @test options["profile"] == "work"
+
+        options = ClaudeBox.parse_args(String["--profile=personal"])
+        @test options["profile"] == "personal"
+
+        # Test profile default is unset
+        options = ClaudeBox.parse_args(String[])
+        @test isnothing(options["profile"])
     end
 
     @testset "State Initialization" begin
@@ -63,6 +74,9 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         @test state.use_gemini == false
         @test state.use_opencode == false
         @test state.use_codex == false
+        @test isnothing(state.claude_profile)
+        @test state.claude_home_dir == joinpath(state.claude_prefix, "claude_home")
+        @test state.claude_json_path == joinpath(state.claude_prefix, "claude.json")
 
         # Test state creation with gemini flag
         state_gemini = ClaudeBox.initialize_state(pwd(), String[], false, false, true, false, false)
@@ -95,6 +109,15 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         # Test codex_home_dir is created
         @test isdir(state.codex_home_dir)
         @test state.codex_home_dir == joinpath(state.claude_prefix, "codex_home")
+
+        # Test Claude Code profile separates login/settings paths but not history.
+        state_profile = ClaudeBox.initialize_state(pwd(), String[], false, false, false, false, false, false, "work")
+        @test state_profile.claude_profile == "work"
+        @test state_profile.claude_home_dir == joinpath(state_profile.claude_prefix, "profiles", "work", "claude_home")
+        @test state_profile.claude_json_path == joinpath(state_profile.claude_prefix, "profiles", "work", "claude.json")
+        @test state_profile.local_dir == state.local_dir
+        @test ClaudeBox.claude_project_history_dir(state_profile.work_dir) == ClaudeBox.claude_project_history_dir(state.work_dir)
+        @test ClaudeBox.claude_project_mount_path("/workspace") == "/root/.claude/projects/-workspace"
     end
 
     @testset "install_jll_tool artifact path types" begin

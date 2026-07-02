@@ -53,7 +53,9 @@ mutable struct AppState
     toolchain_dir::String
     juliaup_dir::String
     julia_dir::String
+    claude_profile::Union{String, Nothing}
     claude_home_dir::String
+    claude_json_path::String
     gemini_home_dir::String
     opencode_home_dir::String
     codex_home_dir::String
@@ -144,7 +146,7 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"], options["profile"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
@@ -262,6 +264,7 @@ function parse_args(args::Vector{String})
         "opencode" => false,
         "codex" => false,
         "preserve" => false,
+        "profile" => nothing,
         "claude_args" => String[]
     )
 
@@ -292,6 +295,16 @@ function parse_args(args::Vector{String})
             options["codex"] = true
         elseif arg == "--preserve"
             options["preserve"] = true
+        elseif arg == "--profile"
+            if i < length(args)
+                i += 1
+                options["profile"] = validate_profile_name(args[i])
+            else
+                cprintln(RED, "Error: --profile requires an argument")
+                exit(1)
+            end
+        elseif startswith(arg, "--profile=")
+            options["profile"] = validate_profile_name(arg[length("--profile=")+1:end])
         elseif arg in ["--work-dir", "-w"]
             if i < length(args)
                 i += 1
@@ -320,6 +333,14 @@ function parse_args(args::Vector{String})
     return options
 end
 
+function validate_profile_name(profile::AbstractString)
+    if isempty(profile) || profile in (".", "..") || !occursin(r"^[A-Za-z0-9._-]+$", profile)
+        cprintln(RED, "Error: --profile must contain only letters, numbers, '.', '_', or '-'")
+        exit(1)
+    end
+    return profile
+end
+
 function print_banner()
     println()
     cprintln(CYAN, "╔════════════════════════════════════════════════╗")
@@ -340,6 +361,7 @@ function print_help()
         -v, --version       Show version information
         -w, --work-dir DIR  Directory to mount as /workspace (default: current)
         --preserve          Mount directory at same path as parent instead of /workspace
+        --profile NAME      Separate Claude Code login/settings under a named profile
         --reset             Reset tools (Node.js, npm, git, gh) but keep Claude settings
         --reset-all         Reset everything including Claude settings
         --reset-julia       Reset Julia depot only (packages and registries)
@@ -385,7 +407,11 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false, claude_profile::Union{String, Nothing}=nothing)::AppState
+    if !isnothing(claude_profile)
+        claude_profile = validate_profile_name(claude_profile)
+    end
+
     tools_prefix = @get_scratch!(TOOLS_SCRATCH_KEY)
     claude_prefix = @get_scratch!(CLAUDE_SCRATCH_KEY)
     julia_depot_prefix = @get_scratch!(JULIA_DEPOT_SCRATCH_KEY)
@@ -397,7 +423,9 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     toolchain_dir = joinpath(tools_prefix, "toolchain")
     juliaup_dir = joinpath(tools_prefix, "juliaup")
     julia_dir = joinpath(julia_depot_prefix, "depot")
-    claude_home_dir = joinpath(claude_prefix, "claude_home")
+    claude_profile_dir = isnothing(claude_profile) ? claude_prefix : joinpath(claude_prefix, "profiles", claude_profile)
+    claude_home_dir = joinpath(claude_profile_dir, "claude_home")
+    claude_json_path = joinpath(claude_profile_dir, "claude.json")
     gemini_home_dir = joinpath(claude_prefix, "gemini_home")
     opencode_home_dir = joinpath(claude_prefix, "opencode_home")
     codex_home_dir = joinpath(claude_prefix, "codex_home")
@@ -434,7 +462,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_home_dir, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, tokens.expires_at, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_profile, claude_home_dir, claude_json_path, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, tokens.expires_at, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path)
 end
 
 """
@@ -852,9 +880,9 @@ function setup_environment!(state::AppState)
     mkpath(state.claude_home_dir)
 
     # Create claude.json file if it doesn't exist
-    claude_json_path = joinpath(state.claude_prefix, "claude.json")
-    if !isfile(claude_json_path)
-        write(claude_json_path, "{}")
+    mkpath(dirname(state.claude_json_path))
+    if !isfile(state.claude_json_path)
+        write(state.claude_json_path, "{}")
     end
 
     # Create claude settings.json with sane defaults if it doesn't exist
@@ -1144,6 +1172,15 @@ end
 
 const SANDBOX_PATH = "/root/.local/bin:/root/.opencode/bin:/opt/npm/bin:/opt/nodejs/bin:/opt/build_tools/bin:/opt/gh_cli/bin:/opt/build_tools/tools:/opt/build_tools/libexec/git-core:/opt/bb2-x86_64-linux-gnu/wrappers:/opt/i686-i686-linux-gnu/wrappers:/opt/bb2-tools/wrappers:/opt/bb2-tools/bin:/opt/juliaup/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 
+claude_project_history_dir(work_dir::AbstractString) =
+    expanduser("~/.claude/projects/$(replace(work_dir, "/" => "-"))")
+
+claude_project_mount_name(workspace_mount::AbstractString) =
+    replace(workspace_mount, "/" => "-")
+
+claude_project_mount_path(workspace_mount::AbstractString) =
+    "/root/.claude/projects/$(claude_project_mount_name(workspace_mount))"
+
 function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
     # Get host platform for debian rootfs
     host_platform = Base.BinaryPlatforms.HostPlatform()
@@ -1161,7 +1198,7 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/opt/juliaup" => Sandbox.MountInfo(state.juliaup_dir, Sandbox.MountType.ReadOnly),
         workspace_mount => Sandbox.MountInfo(state.work_dir, Sandbox.MountType.ReadWrite),
         "/root/.claude" => Sandbox.MountInfo(state.claude_home_dir, Sandbox.MountType.ReadWrite),
-        "/root/.claude.json" => Sandbox.MountInfo(joinpath(state.claude_prefix, "claude.json"), Sandbox.MountType.ReadWrite),
+        "/root/.claude.json" => Sandbox.MountInfo(state.claude_json_path, Sandbox.MountType.ReadWrite),
         "/root/.gemini" => Sandbox.MountInfo(state.gemini_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.opencode" => Sandbox.MountInfo(state.opencode_home_dir, Sandbox.MountType.ReadWrite),
         "/root/.codex" => Sandbox.MountInfo(state.codex_home_dir, Sandbox.MountType.ReadWrite),
@@ -1182,19 +1219,20 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         mounts[SANDBOX_GITHUB_AUTH_DIR] = Sandbox.MountInfo(github_auth_dir(state), Sandbox.MountType.ReadOnly)
     end
 
-    # Map external .claude/projects directory for the current work_dir
-    # Convert work_dir path to claude projects directory name (replace / with -)
-    work_dir_name = replace(state.work_dir, "/" => "-")
-    external_claude_projects = expanduser("~/.claude/projects/$work_dir_name")
+    # Map external .claude/projects directory for the current work_dir. This is
+    # intentionally independent of --profile so Claude Code history remains
+    # shared across work/personal profile splits.
+    external_claude_projects = claude_project_history_dir(state.work_dir)
 
     if !isdir(external_claude_projects)
         mkpath(external_claude_projects)
     end
     # Convert the workspace mount to a project name (replace / with -)
-    projects_mount_name = replace(workspace_mount, "/" => "-")
+    projects_mount_name = claude_project_mount_name(workspace_mount)
+    projects_mount_path = claude_project_mount_path(workspace_mount)
     mkpath(joinpath(state.claude_home_dir, "projects", projects_mount_name))
     # Mount it to the corresponding location inside the sandbox
-    mounts["/root/.claude/projects/$projects_mount_name"] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
+    mounts[projects_mount_path] = Sandbox.MountInfo(external_claude_projects, Sandbox.MountType.ReadWrite)
     cprintln(CYAN, "📁 Mounting external Claude project directory: $external_claude_projects")
 
     # Map external .gemini directory if it exists (overrides the sandbox gemini directory)
@@ -1318,6 +1356,9 @@ function run_sandbox(state::AppState)
     println()
 
     println("📁 Workspace: $(BOLD)$workspace_mount$(RESET) → $(state.work_dir)")
+    if !isnothing(state.claude_profile)
+        println("👤 Claude profile: $(BOLD)$(state.claude_profile)$(RESET)")
+    end
     println("🚪 Exit with: $(BOLD)exit$(RESET) or $(BOLD)Ctrl+D$(RESET)")
 
     # Always use bash, but prepare to launch claude/gemini/opencode/codex if appropriate

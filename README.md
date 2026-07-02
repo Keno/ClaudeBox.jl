@@ -63,6 +63,19 @@ Run claude-code with your current directory mounted:
 ./bin/claudebox -w ~/my-project
 ```
 
+### Claude Code Profiles
+
+Use a named profile to keep Claude Code login and settings separate, for
+example for work and personal accounts:
+
+```bash
+./bin/claudebox --profile work
+./bin/claudebox --profile personal
+```
+
+Profiles use separate `~/.claude` settings and `~/.claude.json` login state
+inside the sandbox. Project history remains shared across profiles.
+
 ### Reset Environment
 
 Clear all cached data and reinstall:
