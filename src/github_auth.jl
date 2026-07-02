@@ -143,32 +143,92 @@ function get_user_info(token::String)
     return (login = "", name = "", email = "")
 end
 
-function refresh_access_token(refresh_token::String; dangerous_mode::Bool=false)
+function oauth_error_message(data)
+    if !haskey(data, "error")
+        return nothing
+    end
+
+    message = string(data["error"])
+    if haskey(data, "error_description") && !isempty(string(data["error_description"]))
+        message *= ": $(data["error_description"])"
+    end
+    if haskey(data, "error_uri") && !isempty(string(data["error_uri"]))
+        message *= " ($(data["error_uri"]))"
+    end
+    return message
+end
+
+token_refresh_error_is_retryable(data) =
+    get(data, "error", "") in ("slow_down", "server_error", "temporarily_unavailable")
+
+http_status_is_retryable(status::Integer) =
+    status == 408 || status == 409 || status == 425 || status == 429 || 500 <= status <= 599
+
+function response_body_snippet(response::HTTP.Response)
+    body = strip(replace(String(response.body), r"\s+" => " "))
+    return length(body) > 240 ? first(body, 240) * "..." : body
+end
+
+function refresh_access_token_result(refresh_token::String; dangerous_mode::Bool=false)
     client_id = dangerous_mode ? DANGEROUS_CLIENT_ID : DEFAULT_CLIENT_ID
     try
         response = HTTP.post(
             ACCESS_TOKEN_URL,
             ["Accept" => "application/json"],
-            "client_id=$(client_id)&refresh_token=$(refresh_token)&grant_type=refresh_token"
+            "client_id=$(client_id)&refresh_token=$(refresh_token)&grant_type=refresh_token";
+            status_exception=false
         )
 
-        if response.status == 200
-            data = JSON.parse(String(response.body))
-            if haskey(data, "access_token")
-                return AccessTokenResponse(
+        data = try
+            JSON.parse(String(response.body))
+        catch e
+            snippet = response_body_snippet(response)
+            reason = isempty(snippet) ?
+                "GitHub token endpoint returned HTTP $(response.status) with a non-JSON response: $(sprint(showerror, e))" :
+                "GitHub token endpoint returned HTTP $(response.status) with a non-JSON response: $snippet"
+            return (
+                response = nothing,
+                reason = reason,
+                retryable = http_status_is_retryable(response.status),
+            )
+        end
+        if response.status == 200 && haskey(data, "access_token")
+            return (
+                response = AccessTokenResponse(
                     data["access_token"],
                     data["token_type"],
                     data["scope"],
                     get(data, "refresh_token", refresh_token),  # May return same or new refresh token
                     get(data, "expires_in", nothing),
                     get(data, "refresh_token_expires_in", nothing)
-                )
-            end
+                ),
+                reason = "",
+                retryable = true,
+            )
         end
+
+        oauth_message = oauth_error_message(data)
+        reason = if isnothing(oauth_message)
+            "GitHub token endpoint returned HTTP $(response.status) without an access token"
+        else
+            "GitHub OAuth error: $oauth_message"
+        end
+        return (
+            response = nothing,
+            reason = reason,
+            retryable = http_status_is_retryable(response.status) || token_refresh_error_is_retryable(data),
+        )
     catch e
-        # Refresh failed, return nothing
+        return (
+            response = nothing,
+            reason = "exception while refreshing token: $(sprint(showerror, e))",
+            retryable = true,
+        )
     end
-    return nothing
+end
+
+function refresh_access_token(refresh_token::String; dangerous_mode::Bool=false)
+    return refresh_access_token_result(refresh_token; dangerous_mode=dangerous_mode).response
 end
 
 function check_claude_sandbox_repo(token::String)
