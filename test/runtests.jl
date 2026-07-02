@@ -118,6 +118,20 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         @test state_profile.local_dir == state.local_dir
         @test ClaudeBox.claude_project_history_dir(state_profile.work_dir) == ClaudeBox.claude_project_history_dir(state.work_dir)
         @test ClaudeBox.claude_project_mount_path("/workspace") == "/root/.claude/projects/-workspace"
+
+        # Test Codex history is separated by workspace under the selected Codex root.
+        @test ClaudeBox.codex_workspace_history_name("/tmp/my-project") == "-tmp-my-project"
+        mktempdir() do codex_root
+            mounts = Dict{String,Sandbox.MountInfo}()
+            history_dir = ClaudeBox.add_codex_workspace_history_mounts!(mounts, codex_root, "/tmp/my-project")
+            @test history_dir == joinpath(codex_root, "workspace_history", "-tmp-my-project")
+            @test isfile(joinpath(history_dir, "history.jsonl"))
+            @test isdir(joinpath(history_dir, "sessions"))
+            @test isdir(joinpath(history_dir, "shell_snapshots"))
+            @test mounts["/root/.codex/history.jsonl"].host_path == joinpath(history_dir, "history.jsonl")
+            @test mounts["/root/.codex/sessions"].host_path == joinpath(history_dir, "sessions")
+            @test mounts["/root/.codex/shell_snapshots"].host_path == joinpath(history_dir, "shell_snapshots")
+        end
     end
 
     @testset "install_jll_tool artifact path types" begin
@@ -354,6 +368,12 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
             # Otherwise, should use the sandbox codex_home_dir
             @test mounts_codex["/root/.codex"].host_path == state_codex.codex_home_dir
         end
+
+        codex_root = mounts_codex["/root/.codex"].host_path
+        codex_history_dir = ClaudeBox.codex_workspace_history_dir(codex_root, state_codex.work_dir)
+        @test mounts_codex["/root/.codex/history.jsonl"].host_path == joinpath(codex_history_dir, "history.jsonl")
+        @test mounts_codex["/root/.codex/sessions"].host_path == joinpath(codex_history_dir, "sessions")
+        @test mounts_codex["/root/.codex/shell_snapshots"].host_path == joinpath(codex_history_dir, "shell_snapshots")
 
         # Test with claude mode (codex disabled)
         state_claude = ClaudeBox.initialize_state(pwd(), String[], false, false, false, false, false)  # use_codex = false

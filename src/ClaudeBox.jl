@@ -1181,6 +1181,33 @@ claude_project_mount_name(workspace_mount::AbstractString) =
 claude_project_mount_path(workspace_mount::AbstractString) =
     "/root/.claude/projects/$(claude_project_mount_name(workspace_mount))"
 
+external_codex_dir() = expanduser("~/.codex")
+
+codex_workspace_history_name(work_dir::AbstractString) =
+    replace(work_dir, "/" => "-")
+
+codex_workspace_history_dir(codex_root::AbstractString, work_dir::AbstractString) =
+    joinpath(codex_root, "workspace_history", codex_workspace_history_name(work_dir))
+
+function add_codex_workspace_history_mounts!(mounts::Dict{String, Sandbox.MountInfo}, codex_root::AbstractString, work_dir::AbstractString)
+    workspace_history_dir = codex_workspace_history_dir(codex_root, work_dir)
+    mkpath(workspace_history_dir)
+
+    history_file = joinpath(workspace_history_dir, "history.jsonl")
+    if !isfile(history_file)
+        touch(history_file)
+    end
+    mounts["/root/.codex/history.jsonl"] = Sandbox.MountInfo(history_file, Sandbox.MountType.ReadWrite)
+
+    for history_dirname in ("sessions", "shell_snapshots")
+        host_path = joinpath(workspace_history_dir, history_dirname)
+        mkpath(host_path)
+        mounts["/root/.codex/$history_dirname"] = Sandbox.MountInfo(host_path, Sandbox.MountType.ReadWrite)
+    end
+
+    return workspace_history_dir
+end
+
 function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.stdout, stderr=Base.stderr)::Sandbox.SandboxConfig
     # Get host platform for debian rootfs
     host_platform = Base.BinaryPlatforms.HostPlatform()
@@ -1258,11 +1285,16 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     # Map external .codex directory if it exists (overrides the sandbox codex directory)
     # Only mount when actually using Codex
     if state.use_codex
-        external_codex_dir = expanduser("~/.codex")
-        if isdir(external_codex_dir)
-            mounts["/root/.codex"] = Sandbox.MountInfo(external_codex_dir, Sandbox.MountType.ReadWrite)
-            cprintln(CYAN, "📁 Mounting external Codex configuration: $external_codex_dir")
+        codex_root = state.codex_home_dir
+        external_codex_config_dir = external_codex_dir()
+        if isdir(external_codex_config_dir)
+            codex_root = external_codex_config_dir
+            mounts["/root/.codex"] = Sandbox.MountInfo(codex_root, Sandbox.MountType.ReadWrite)
+            cprintln(CYAN, "📁 Mounting external Codex configuration: $codex_root")
         end
+
+        codex_history_dir = add_codex_workspace_history_mounts!(mounts, codex_root, state.work_dir)
+        cprintln(CYAN, "📁 Mounting Codex workspace history: $codex_history_dir")
     end
 
     # Add resolv.conf for DNS resolution if it exists

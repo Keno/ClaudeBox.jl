@@ -76,6 +76,13 @@ example for work and personal accounts:
 Profiles use separate `~/.claude` settings and `~/.claude.json` login state
 inside the sandbox. Project history remains shared across profiles.
 
+### Codex History
+
+When running with `--codex`, ClaudeBox reuses your shared Codex login,
+settings, rules, and plugins from `~/.codex` when available. Prompt history,
+session transcripts, and shell snapshots are separated per workspace folder so
+work on different projects does not share Codex history.
+
 ### Reset Environment
 
 Clear all cached data and reinstall:
