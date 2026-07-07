@@ -31,6 +31,8 @@ const VERSION = "1.0.0"
 const SANDBOX_GITHUB_AUTH_DIR = "/run/claudebox-github"
 const SANDBOX_GITHUB_TOKEN_FILE = "$SANDBOX_GITHUB_AUTH_DIR/token"
 const GITHUB_TOKEN_REFRESH_SKEW_SECONDS = 5 * 60
+const GITHUB_TOKEN_REFRESH_INITIAL_RETRY_SECONDS = 5 * 60.0
+const GITHUB_TOKEN_REFRESH_MAX_RETRY_SECONDS = 60 * 60.0
 
 # Helper functions for colored output
 cprintln(color, text) = println(color, text, RESET)
@@ -154,13 +156,14 @@ function _main(args::Vector{String})::Cint
         # expiry time.
         if has_github_refresh_token(state)
             cprintln(YELLOW, "Refreshing GitHub token...")
-            if refresh_github_token!(state; verbose=true)
+            refresh_result = refresh_github_token_result!(state; verbose=true)
+            if refresh_result.success
                 cprintln(GREEN, "✓ GitHub token refreshed successfully")
             elseif !isempty(state.github_token) && GitHubAuth.validate_token(state.github_token; silent=true)
-                cprintln(YELLOW, "⚠ Failed to refresh GitHub token; using existing valid token")
+                cprintln(YELLOW, "⚠ Failed to refresh GitHub token ($(refresh_result.reason)); using existing valid token")
                 write_sandbox_github_token(state)
             else
-                cprintln(YELLOW, "Failed to refresh token, requesting new authentication...")
+                cprintln(YELLOW, "Failed to refresh token ($(refresh_result.reason)), requesting new authentication...")
                 state.github_token = ""
                 state.github_refresh_token = nothing
                 state.github_token_expires_at = nothing
@@ -637,22 +640,26 @@ function write_sandbox_github_token(state::AppState)
     return nothing
 end
 
-function refresh_github_token!(state::AppState; verbose::Bool=false)
-    has_github_refresh_token(state) || return false
+function refresh_github_token_result!(state::AppState; verbose::Bool=false)
+    has_github_refresh_token(state) || return (success = false, reason = "no GitHub refresh token is available", retryable = false)
 
-    refresh_response = GitHubAuth.refresh_access_token(
+    refresh_result = GitHubAuth.refresh_access_token_result(
         state.github_refresh_token;
         dangerous_mode=state.dangerous_github_auth)
-    if isnothing(refresh_response)
-        return false
+    if isnothing(refresh_result.response)
+        return (success = false, reason = refresh_result.reason, retryable = refresh_result.retryable)
     end
 
-    store_github_token_response!(state, refresh_response)
+    store_github_token_response!(state, refresh_result.response)
     if verbose
         filename = state.dangerous_github_auth ? "github_tokens_dangerous.json" : "github_tokens.json"
         cprintln(CYAN, "   Token location: $(joinpath(state.claude_prefix, filename))")
     end
-    return true
+    return (success = true, reason = "", retryable = true)
+end
+
+function refresh_github_token!(state::AppState; verbose::Bool=false)
+    return refresh_github_token_result!(state; verbose).success
 end
 
 function seconds_until_github_token_refresh(state::AppState)
@@ -662,16 +669,27 @@ function seconds_until_github_token_refresh(state::AppState)
     return max(state.github_token_expires_at - time() - GITHUB_TOKEN_REFRESH_SKEW_SECONDS, 1.0)
 end
 
+next_github_token_refresh_retry_delay(delay::Real) =
+    min(Float64(delay) * 2, GITHUB_TOKEN_REFRESH_MAX_RETRY_SECONDS)
+
 function start_github_token_refresh_task!(state::AppState)
     has_github_refresh_token(state) || return nothing
     write_sandbox_github_token(state)
 
     return @async begin
+        retry_delay = GITHUB_TOKEN_REFRESH_INITIAL_RETRY_SECONDS
         while has_github_refresh_token(state)
             sleep(seconds_until_github_token_refresh(state))
-            if !refresh_github_token!(state)
-                @warn "ClaudeBox: failed to refresh GitHub token; will retry" token_file=github_token_file(state)
-                sleep(5 * 60)
+            refresh_result = refresh_github_token_result!(state)
+            if refresh_result.success
+                retry_delay = GITHUB_TOKEN_REFRESH_INITIAL_RETRY_SECONDS
+            elseif refresh_result.retryable
+                @warn "ClaudeBox: failed to refresh GitHub token; will retry with backoff" reason=refresh_result.reason retry_in_seconds=round(Int, retry_delay) token_file=github_token_file(state)
+                sleep(retry_delay)
+                retry_delay = next_github_token_refresh_retry_delay(retry_delay)
+            else
+                @warn "ClaudeBox: failed to refresh GitHub token; background refresh stopped" reason=refresh_result.reason token_file=github_token_file(state)
+                break
             end
         end
     end

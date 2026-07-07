@@ -177,6 +177,8 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
 
             @test ClaudeBox.has_github_refresh_token(state)
             @test ClaudeBox.seconds_until_github_token_refresh(state) > 3000
+            @test ClaudeBox.next_github_token_refresh_retry_delay(ClaudeBox.GITHUB_TOKEN_REFRESH_INITIAL_RETRY_SECONDS) == 10 * 60.0
+            @test ClaudeBox.next_github_token_refresh_retry_delay(ClaudeBox.GITHUB_TOKEN_REFRESH_MAX_RETRY_SECONDS) == ClaudeBox.GITHUB_TOKEN_REFRESH_MAX_RETRY_SECONDS
 
             ClaudeBox.write_sandbox_github_token(state)
             token_file = ClaudeBox.github_token_file(state)
@@ -209,6 +211,22 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
 
             cmd = string(ClaudeBox.build_cli_command(state))
             @test !occursin("--mcp-config", cmd)
+
+            oauth_error = Dict(
+                "error" => "bad_refresh_token",
+                "error_description" => "The refresh token is invalid"
+            )
+            @test ClaudeBox.GitHubAuth.oauth_error_message(oauth_error) == "bad_refresh_token: The refresh token is invalid"
+            @test !ClaudeBox.GitHubAuth.token_refresh_error_is_retryable(oauth_error)
+            @test ClaudeBox.GitHubAuth.token_refresh_error_is_retryable(Dict("error" => "temporarily_unavailable"))
+            @test ClaudeBox.GitHubAuth.http_status_is_retryable(500)
+            @test !ClaudeBox.GitHubAuth.http_status_is_retryable(400)
+
+            state.github_refresh_token = nothing
+            refresh_result = ClaudeBox.refresh_github_token_result!(state)
+            @test refresh_result.success == false
+            @test refresh_result.retryable == false
+            @test occursin("no GitHub refresh token", refresh_result.reason)
         end
     end
 
