@@ -43,6 +43,45 @@ function lexists(path::AbstractString)
     return ispath(lstat(path))
 end
 
+# When the workspace is a git worktree, its top-level `.git` is a file of the
+# form `gitdir: /path/to/mainrepo/.git/worktrees/<name>` rather than a
+# directory. That gitdir (and the shared "common dir" it links to) live outside
+# the workspace, so git operations fail inside the sandbox unless those paths
+# are made available at their original locations. This returns the host paths
+# that need to be mounted (the common dir and, if separate, the worktree
+# gitdir), or an empty vector if the workspace is not a git worktree.
+function git_worktree_gitdirs(work_dir::AbstractString)
+    dotgit = joinpath(work_dir, ".git")
+    isfile(dotgit) || return String[]
+    content = try
+        read(dotgit, String)
+    catch
+        return String[]
+    end
+    m = match(r"^gitdir:\s*(.+?)\s*$"m, content)
+    m === nothing && return String[]
+    # Normalize by stripping any trailing slash left by `..` resolution so the
+    # containment check below and the mount paths stay clean.
+    norm(p) = (s = rstrip(String(p), '/'); isempty(s) ? "/" : s)
+    gitdir = String(strip(m.captures[1]))
+    isabspath(gitdir) || (gitdir = abspath(joinpath(work_dir, gitdir)))
+    gitdir = norm(gitdir)
+    isdir(gitdir) || return String[]
+    paths = [gitdir]
+    # The common dir holds the shared object store/refs; for a standard worktree
+    # it is the parent repo's `.git`, an ancestor of gitdir.
+    commondir_file = joinpath(gitdir, "commondir")
+    if isfile(commondir_file)
+        common = String(strip(read(commondir_file, String)))
+        isabspath(common) || (common = abspath(joinpath(gitdir, common)))
+        common = norm(common)
+        isdir(common) && push!(paths, common)
+    end
+    # Drop any path nested inside another candidate (keep the outermost), so we
+    # don't create redundant overlapping mounts.
+    return filter(p -> !any(q -> q != p && startswith(p, rstrip(q, '/') * "/"), paths), paths)
+end
+
 mutable struct AppState
     tools_prefix::String
     claude_prefix::String
@@ -1261,6 +1300,20 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "/root/.julia" => Sandbox.MountInfo(state.julia_dir, Sandbox.MountType.ReadWrite),
         "/root/.local" => Sandbox.MountInfo(state.local_dir, Sandbox.MountType.ReadWrite)
     )
+
+    # If the workspace is a git worktree, its `.git` file points at a gitdir (and
+    # shared common dir) that live outside the workspace. Mount them read-only at
+    # their original host paths so git resolves the worktree inside the sandbox.
+    for gitpath in git_worktree_gitdirs(state.work_dir)
+        # Skip anything already covered by an existing (non-root) mount. The
+        # root mount "/" is excluded: every mount is nested under it, so it would
+        # spuriously "cover" every absolute path.
+        covered = any(p -> p != "/" && (gitpath == p || startswith(gitpath, rstrip(p, '/') * "/")), keys(mounts))
+        if !covered
+            mounts[gitpath] = Sandbox.MountInfo(gitpath, Sandbox.MountType.ReadOnly)
+            cprintln(CYAN, "📁 Mounting git worktree directory (read-only): $gitpath")
+        end
+    end
 
     # Add claude_sandbox repository if available
     if !isnothing(state.claude_sandbox_dir) && isdir(state.claude_sandbox_dir)
