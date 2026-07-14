@@ -313,6 +313,33 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         @test mounts["/root/.gitconfig"].host_path == gitconfig_path
     end
 
+    @testset "Host git config identity" begin
+        mktempdir() do dir
+            cfg = joinpath(dir, "gitconfig")
+            # Point git at a controlled global config and ignore system config, so
+            # the test exercises git's normal resolution without hard-coded paths.
+            # Run from the (non-repo) temp dir so no local config leaks in.
+            withenv("GIT_CONFIG_GLOBAL" => cfg, "GIT_CONFIG_NOSYSTEM" => "1") do
+                cd(dir) do
+                    # Missing/empty config yields nothing
+                    @test ClaudeBox.host_git_config("user.name") === nothing
+
+                    # Populated identity is read back
+                    write(cfg, """
+                    [user]
+                        name = Ada Lovelace
+                        email = ada@example.com
+                    """)
+                    @test ClaudeBox.host_git_config("user.name") == "Ada Lovelace"
+                    @test ClaudeBox.host_git_config("user.email") == "ada@example.com"
+
+                    # Unset key yields nothing
+                    @test ClaudeBox.host_git_config("user.signingkey") === nothing
+                end
+            end
+        end
+    end
+
     @testset "Gemini Configuration Mounting" begin
         # Test with gemini mode enabled
         state_gemini = ClaudeBox.initialize_state(pwd(), String[], false, false, true, false, false)  # use_gemini = true

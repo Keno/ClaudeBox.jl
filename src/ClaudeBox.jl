@@ -82,6 +82,18 @@ function git_worktree_gitdirs(work_dir::AbstractString)
     return filter(p -> !any(q -> q != p && startswith(p, rstrip(q, '/') * "/"), paths), paths)
 end
 
+# Read a single value (e.g. "user.name") from the host's git config, letting git
+# resolve its normal config hierarchy, so the sandbox can inherit the user's real
+# git identity. Returns `nothing` when the key is unset or git is unavailable.
+function host_git_config(key::AbstractString)
+    value = try
+        strip(read(`git config --get $key`, String))
+    catch
+        return nothing
+    end
+    return isempty(value) ? nothing : String(value)
+end
+
 mutable struct AppState
     tools_prefix::String
     claude_prefix::String
@@ -962,7 +974,9 @@ function setup_environment!(state::AppState)
 
     # Create a global gitconfig with SSL settings and user info
     gitconfig_path = joinpath(state.tools_prefix, "gitconfig")
-    if !isfile(gitconfig_path) || !isempty(state.github_token)
+    host_name = host_git_config("user.name")
+    host_email = host_git_config("user.email")
+    if !isfile(gitconfig_path) || !isempty(state.github_token) || !isnothing(host_name) || !isnothing(host_email)
         # Get user info from GitHub if we have a token
         user_name = "Sandbox User"
         user_email = "sandbox@localhost"
@@ -980,6 +994,14 @@ function setup_environment!(state::AppState)
             elseif !isnothing(user_info.login) && !isempty(user_info.login)
                 user_email = "$(user_info.login)@users.noreply.github.com"
             end
+        end
+
+        # Prefer the host's global git config identity over GitHub-derived values
+        if !isnothing(host_name)
+            user_name = host_name
+        end
+        if !isnothing(host_email)
+            user_email = host_email
         end
 
         write(gitconfig_path, """
