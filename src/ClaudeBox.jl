@@ -1525,7 +1525,7 @@ You are running inside a ClaudeBox sandbox - a secure, isolated environment.
 - You have full read/write access to `$workspace_mount`
 - System directories are read-only or overlayed
 - Network access is available
-- The environment resets when you exit (except for `$workspace_mount`)
+- The environment (including `/tmp`) may reset at any time; only `$workspace_mount` persists
 
 ## GitHub Integration
 
@@ -1540,6 +1540,8 @@ end)$claude_sandbox_section$github_token_section
 ## Tips
 
 - Use the workspace directory for all file operations
+- Do NOT place git worktrees, build trees, or any state you cannot cheaply regenerate under `/tmp` — it may be wiped mid-session. Put worktrees under `$workspace_mount/.worktrees/<name>` (add that path to `.git/info/exclude`) and keep plan/progress files in the repo or your memory directory
+- Use `/tmp` only for genuinely disposable intermediates, and push work-in-progress branches to a remote early and often
 - Git commits will use the configured user name and email
 - The sandbox provides a consistent, clean environment
 """
