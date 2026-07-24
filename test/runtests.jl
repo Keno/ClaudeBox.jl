@@ -134,6 +134,47 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         end
     end
 
+    @testset "Git Worktree Mounts" begin
+        # A workspace whose `.git` is a real directory is not a worktree.
+        mktempdir() do dir
+            mkdir(joinpath(dir, ".git"))
+            @test isempty(ClaudeBox.git_worktree_gitdirs(dir))
+        end
+
+        # A workspace with no `.git` at all is not a worktree.
+        mktempdir() do dir
+            @test isempty(ClaudeBox.git_worktree_gitdirs(dir))
+        end
+
+        # A worktree: `.git` is a file pointing at a gitdir whose `commondir`
+        # resolves to the parent repo's `.git`. Only the (outermost) common dir
+        # should be returned, since it contains the worktree gitdir.
+        mktempdir() do root
+            gitdir = joinpath(root, "main", ".git", "worktrees", "wt1")
+            common = joinpath(root, "main", ".git")
+            wt = joinpath(root, "wt")
+            mkpath(gitdir)
+            mkpath(wt)
+            write(joinpath(wt, ".git"), "gitdir: $gitdir\n")
+            write(joinpath(gitdir, "commondir"), "../..\n")
+            @test ClaudeBox.git_worktree_gitdirs(wt) == [common]
+        end
+
+        # A worktree whose gitdir is not nested under its common dir: both paths
+        # are returned.
+        mktempdir() do root
+            gitdir = joinpath(root, "wtmeta")
+            common = joinpath(root, "repo", ".git")
+            wt = joinpath(root, "wt")
+            mkpath(gitdir)
+            mkpath(common)
+            mkpath(wt)
+            write(joinpath(wt, ".git"), "gitdir: $gitdir\n")
+            write(joinpath(gitdir, "commondir"), common)
+            @test sort(ClaudeBox.git_worktree_gitdirs(wt)) == sort([gitdir, common])
+        end
+    end
+
     @testset "install_jll_tool artifact path types" begin
         # Regression test for issue #23: collect_artifact_paths returns a
         # Dict{PackageSpec, Vector{String}}, which must be passed directly to
