@@ -1381,7 +1381,10 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "LANG" => "C.UTF-8",
         "USER" => "root",
         "WORKSPACE" => workspace_mount,
-        "JULIA_DEPOT_PATH" => "/root/.julia",
+        # Trailing separator keeps the default depot entries (e.g. a Julia
+        # checkout's usr/share/julia bundled depot) appended after the user
+        # depot; a bare path REPLACES the chain and hides bundled pkgimages.
+        "JULIA_DEPOT_PATH" => "/root/.julia:",
         "IS_SANDBOX" => "1"
     )
 
