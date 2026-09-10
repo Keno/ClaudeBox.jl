@@ -118,10 +118,7 @@ the shell opened by `--bash`. Exiting or crashing cannot leave recording enabled
 in the repository, and another invocation has its own settings and hooks.
 Existing Entire configuration outside ClaudeBox is preserved.
 
-The CLI cache and Entire account configuration remain persistent. If you used
-the earlier implementation that enabled Entire permanently, undo that activation
-once: launch ClaudeBox with `--bash` and without `--entireio`, exit the agent,
-then run `entire disable --local` in the repository from the remaining shell.
+The CLI cache and Entire account configuration remain persistent.
 
 ### Reset Environment
 
