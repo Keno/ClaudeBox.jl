@@ -20,13 +20,88 @@
         state.use_gemini = gemini
         state.use_opencode = opencode
         state.use_codex = codex
-        @test ClaudeBox.entireio_enable_command(state).exec ==
+        @test ClaudeBox.entireio_enable_command(state).exec[5:end] ==
               ["entire", "enable", "--agent", agent, "--local", "--skip-push-sessions", "--telemetry=false", "--yes"]
     end
 
     state.use_entireio = false
     ClaudeBox.setup_entireio!(_ -> error("Entire must be opt-in"), state)
     state.use_entireio = true
+
+    @testset "Sandbox executable lookup" begin
+        mktempdir() do root
+            repo = joinpath(root, "repository with spaces")
+            bin_dir = joinpath(root, "bin")
+            mkpath(repo)
+            mkpath(bin_dir)
+            run(`git init -q $repo`)
+            symlink(Sys.which("git"), joinpath(bin_dir, "git"))
+            args_file = joinpath(root, "entire-args")
+            write(joinpath(bin_dir, "entire"), raw"""
+#!/bin/sh
+printf '%s\n' "$@" > "$CLAUDEBOX_TEST_ENTIRE_ARGS"
+""")
+            chmod(joinpath(bin_dir, "entire"), 0o755)
+            touch(joinpath(bin_dir, "git-remote-entire"))
+            write(joinpath(bin_dir, "arguments"), raw"""
+#!/bin/sh
+printf '%s\0' "$@"
+""")
+            chmod(joinpath(bin_dir, "arguments"), 0o755)
+
+            # Match UserNSSandbox's execve semantics without needing permission
+            # to create a namespace: execv also does not search PATH.
+            exec_script = raw"""
+ccall(:execv, Cint, (Cstring, Ptr{Cstring}), ARGS[1], ARGS)
+println(stderr, "Failed to run ", ARGS[1], ": ", Libc.errno())
+exit(1)
+"""
+            function direct_exec(cmd; path=bin_dir * ":" * ENV["PATH"])
+                child = `$(Base.julia_cmd()) --startup-file=no --history-file=no -e $exec_script $cmd`
+                setenv(Cmd(child; dir=repo), Dict(
+                    "PATH" => path,
+                    "GIT_CONFIG_GLOBAL" => "/dev/null",
+                    "GIT_CONFIG_NOSYSTEM" => "1",
+                    "CLAUDEBOX_TEST_ENTIRE_ARGS" => args_file,
+                ))
+            end
+            @test !success(pipeline(direct_exec(`git --version`); stdout=devnull, stderr=devnull))
+            @test !success(pipeline(direct_exec(`entire enable`); stdout=devnull, stderr=devnull))
+
+            # Exercise the production Git queries and Entire enable command
+            # through a launcher that rejects bare executable names.
+            scoped_state = ClaudeBox.initialize_state(repo; use_entireio=true)
+            scoped_state.local_dir = root
+            mounts = Dict(repo => ClaudeBox.Sandbox.MountInfo(repo, ClaudeBox.Sandbox.MountType.ReadWrite))
+            ClaudeBox.with_entireio_mounts(scoped_state, mounts, cmd -> read(direct_exec(cmd), String)) do
+                ClaudeBox.setup_entireio!(cmd -> run(direct_exec(cmd)), scoped_state)
+            end
+            @test readlines(args_file) == ["enable", "--agent", "claude-code", "--local", "--skip-push-sessions", "--telemetry=false", "--yes"]
+
+            args = ["a path with spaces", "", "quote'\"", raw"$HOME", raw"$(touch injected)", "`touch injected`", "a;b", "*"]
+            command = ClaudeBox.entireio_sandbox_command(Cmd(["arguments"; args]))
+            @test split(read(direct_exec(command), String), '\0')[1:end-1] == args
+            @test !ispath(joinpath(repo, "injected"))
+
+            # Preserve launch errors, including the actual exit status and
+            # stderr, instead of claiming an existing repository is missing.
+            stderr_buffer = IOBuffer()
+            failure = try
+                ClaudeBox.with_entireio_mounts(scoped_state, mounts,
+                    cmd -> read(pipeline(direct_exec(cmd; path=""); stderr=stderr_buffer), String)) do
+                    error("Must not launch without Git")
+                end
+                nothing
+            catch err
+                err
+            end
+            @test failure isa ProcessFailedException
+            if failure isa ProcessFailedException
+                @test only(failure.procs).exitcode == 127
+            end
+            @test occursin("git: not found", String(take!(stderr_buffer)))
+        end
+    end
 
     @testset "Invocation-scoped configuration" begin
         mktempdir() do repo
@@ -120,7 +195,7 @@
     @testset "Existing Git repository required" begin
         mktempdir() do dir
             calls = Cmd[]
-            @test_throws r"--entireio requires an existing Git working tree" ClaudeBox.setup_entireio!(state) do cmd
+            @test_throws ProcessFailedException ClaudeBox.setup_entireio!(state) do cmd
                 push!(calls, cmd)
                 length(calls) == 1 || error("Must reject a non-repository before installing Entire")
                 run(Cmd(cmd; dir))
@@ -141,7 +216,7 @@
             calls = Cmd[]
             ClaudeBox.setup_entireio!(state) do cmd
                 push!(calls, cmd)
-                if first(cmd.exec) == "/bin/sh"
+                if length(calls) == 1
                     run(Cmd(cmd; dir))
                 end
             end

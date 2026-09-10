@@ -3,6 +3,15 @@
 const ENTIREIO_VERSION = "0.10.6"
 const ENTIREIO_RELEASE_URL = "https://github.com/entireio/cli/releases/download/v$ENTIREIO_VERSION"
 
+# UserNSSandbox uses execve, which does not search PATH. Start an absolute shell
+# and let it resolve the program, keeping every argument out of shell source.
+function entireio_sandbox_command(cmd::Cmd)
+    script = raw"""
+exec "$@"
+"""
+    return `/bin/sh -c $script claudebox-entireio $cmd`
+end
+
 function entireio_agent(state::AppState)
     state.use_codex && return "codex"
     state.use_opencode && return "opencode"
@@ -39,7 +48,7 @@ end
 
 function entireio_enable_command(state::AppState)
     agent = entireio_agent(state)
-    return `entire enable --agent $agent --local --skip-push-sessions --telemetry=false --yes`
+    return entireio_sandbox_command(`entire enable --agent $agent --local --skip-push-sessions --telemetry=false --yes`)
 end
 
 function entireio_agent_config_dir(state::AppState)
@@ -80,14 +89,11 @@ The workspace and Git database stay writable, so recorded checkpoints persist.
 function with_entireio_mounts(f::Function, state::AppState, mounts, read_command::Function)
     state.use_entireio || return f()
 
-    repo_root = try
-        chomp(read_command(`git rev-parse --show-toplevel`))
-    catch err
-        err isa ProcessFailedException || rethrow()
-        error("--entireio requires an existing Git working tree accessible inside the sandbox; use -w to select its root")
-    end
-    hooks_dir = chomp(read_command(`git rev-parse --path-format=absolute --git-path hooks`))
-    git_dirs = split(chomp(read_command(`git rev-parse --path-format=absolute --git-common-dir --git-dir`)), '\n')
+    # Preserve Git/launcher failures rather than labelling all of them as a
+    # missing repository (e.g. a missing executable or unsafe ownership).
+    repo_root = chomp(read_command(entireio_sandbox_command(`git rev-parse --show-toplevel`)))
+    hooks_dir = chomp(read_command(entireio_sandbox_command(`git rev-parse --path-format=absolute --git-path hooks`)))
+    git_dirs = split(chomp(read_command(entireio_sandbox_command(`git rev-parse --path-format=absolute --git-common-dir --git-dir`))), '\n')
     if any((repo_root, git_dirs...)) do persistent_path
         persistent_path == hooks_dir || startswith(persistent_path, hooks_dir * "/")
     end
@@ -121,12 +127,7 @@ function setup_entireio!(run_command::Function, state::AppState)
 
     # --yes can initialize and publish a new repository when invoked outside
     # Git. Require an existing working tree before installing or enabling Entire.
-    try
-        run_command(`/bin/sh -c "git rev-parse --show-toplevel >/dev/null 2>&1"`)
-    catch err
-        err isa ProcessFailedException || rethrow()
-        error("--entireio requires an existing Git working tree accessible inside the sandbox; use -w to select its root")
-    end
+    run_command(`/bin/sh -c "git rev-parse --show-toplevel >/dev/null"`)
 
     if !all(name -> isfile(joinpath(state.local_dir, "bin", name)), ("entire", "git-remote-entire"))
         cprintln(YELLOW, "Installing Entire CLI v$ENTIREIO_VERSION...")
