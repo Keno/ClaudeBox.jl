@@ -86,7 +86,7 @@ work on different projects does not share Codex history.
 ### Entire Session Recording
 
 Enable [Entire](https://github.com/entireio/cli) recording for the selected agent
-in an existing Git repository:
+for this ClaudeBox invocation, in an existing Git repository:
 
 ```bash
 ./bin/claudebox --entireio -w ~/my-project
@@ -96,10 +96,10 @@ in an existing Git repository:
 This also works with `--gemini` and `--opencode`. ClaudeBox installs Entire CLI
 v0.10.6 on first use, verifies the release checksum, and caches the binaries in
 the sandbox's persistent `~/.local/bin`. Existing installations are reused.
-Entire is enabled before the agent starts, using `.entire/settings.local.json`,
-with telemetry and automatic checkpoint pushes disabled. No Entire login is
-required. Git must be able to access the working tree from inside the sandbox;
-ClaudeBox will not initialize a repository for you.
+Entire is enabled before the agent starts, with telemetry and automatic
+checkpoint pushes disabled. No Entire login is required. Git must be able to
+access the working tree from inside the sandbox; ClaudeBox will not initialize
+a repository for you.
 
 Add `--bash` to keep the shell open after the agent exits, then inspect the
 recording with:
@@ -109,12 +109,19 @@ entire checkpoint list
 entire checkpoint explain HEAD --full
 ```
 
-Checkpoints are linked to Git commits. The settings and agent/Git hooks persist
-in the repository, so omitting `--entireio` on a later launch does not uninstall
-them. Run `entire disable --local` inside the sandbox to stop recording; using
-`--entireio` again re-enables it. Each launch with the flag reapplies the local
-recording settings above. Entire's own configuration directory is also
-persistent, should you later choose to log in for hosted features.
+Checkpoints are linked to Git commits and persist after the invocation ends.
+Entire's `.entire` directory, the selected agent's project hook directory
+(`.claude`, `.codex`, `.gemini`, or `.opencode/plugins`), and the active Git hooks
+directory use private temporary copies. Their existing contents remain visible,
+but edits within these directories last only for this invocation. This includes
+the shell opened by `--bash`. Exiting or crashing cannot leave recording enabled
+in the repository, and another invocation has its own settings and hooks.
+Existing Entire configuration outside ClaudeBox is preserved.
+
+The CLI cache and Entire account configuration remain persistent. If you used
+the earlier implementation that enabled Entire permanently, undo that activation
+once: launch ClaudeBox with `--bash` and without `--entireio`, exit the agent,
+then run `entire disable --local` in the repository from the remaining shell.
 
 ### Reset Environment
 

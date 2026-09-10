@@ -28,6 +28,95 @@
     ClaudeBox.setup_entireio!(_ -> error("Entire must be opt-in"), state)
     state.use_entireio = true
 
+    @testset "Invocation-scoped configuration" begin
+        mktempdir() do repo
+            run(`git init -q $repo`)
+            mkpath(joinpath(repo, ".entire"))
+            original_settings = "{\"enabled\":false,\"telemetry\":false}\n"
+            write(joinpath(repo, ".entire", "settings.local.json"), original_settings)
+            original_hook = "#!/bin/sh\nexit 0\n"
+            write(joinpath(repo, ".git", "hooks", "pre-commit"), original_hook)
+
+            for (gemini, opencode, codex, config_dir) in (
+                (false, false, false, ".claude"),
+                (true, false, false, ".gemini"),
+                (false, true, false, ".opencode/plugins"),
+                (false, false, true, ".codex"),
+                (true, true, true, ".codex"),
+            )
+                state.use_gemini, state.use_opencode, state.use_codex = gemini, opencode, codex
+                for workspace_mount in ("/workspace", repo)
+                    mounts = Dict(workspace_mount => ClaudeBox.Sandbox.MountInfo(repo, ClaudeBox.Sandbox.MountType.ReadWrite))
+                    original_mounts = copy(mounts)
+                    read_git(cmd) = replace(read(Cmd(cmd; dir=repo), String), repo => workspace_mount)
+                    temporary_source = ""
+                    result = ClaudeBox.with_entireio_mounts(state, mounts, read_git) do
+                        @test mounts[workspace_mount].type == ClaudeBox.Sandbox.MountType.ReadWrite
+                        for path in (".entire", config_dir, ".git/hooks")
+                            @test mounts[joinpath(workspace_mount, path)].host_path != joinpath(repo, path)
+                        end
+                        private_settings = joinpath(mounts[joinpath(workspace_mount, ".entire")].host_path, "settings.local.json")
+                        private_hook = joinpath(mounts[joinpath(workspace_mount, ".git/hooks")].host_path, "pre-commit")
+                        @test read(private_settings, String) == original_settings
+                        @test read(private_hook, String) == original_hook
+                        write(private_settings, "{\"enabled\":true}\n")
+                        write(private_hook, "#!/bin/sh\nentire hooks git pre-commit\n")
+                        @test read(joinpath(repo, ".entire", "settings.local.json"), String) == original_settings
+                        @test read(joinpath(repo, ".git", "hooks", "pre-commit"), String) == original_hook
+                        @test !haskey(mounts, joinpath(workspace_mount, ".git"))
+                        temporary_source = mounts[joinpath(workspace_mount, config_dir)].host_path
+                        @test isdir(temporary_source)
+
+                        # A simultaneous launch gets its own copies. Its exit
+                        # must not remove or disable the first launch's mounts.
+                        concurrent_mounts = copy(original_mounts)
+                        ClaudeBox.with_entireio_mounts(state, concurrent_mounts, read_git) do
+                            @test concurrent_mounts[joinpath(workspace_mount, config_dir)].host_path != temporary_source
+                            @test read(joinpath(concurrent_mounts[joinpath(workspace_mount, ".entire")].host_path, "settings.local.json"), String) == original_settings
+                        end
+                        @test concurrent_mounts == original_mounts
+                        @test isdir(temporary_source)
+                        return :invocation_finished
+                    end
+                    @test result == :invocation_finished
+                    @test mounts == original_mounts
+                    @test !ispath(temporary_source)
+                    @test read(joinpath(repo, ".entire", "settings.local.json"), String) == original_settings
+                    @test read(joinpath(repo, ".git", "hooks", "pre-commit"), String) == original_hook
+
+                    # A later invocation without the flag makes no Entire
+                    # queries and receives the repository's original mounts.
+                    state.use_entireio = false
+                    @test ClaudeBox.with_entireio_mounts(() -> mounts == original_mounts, state, mounts,
+                                                        _ -> error("Entire must be opt-in"))
+                    state.use_entireio = true
+                    @test_throws r"agent failed" ClaudeBox.with_entireio_mounts(state, mounts, read_git) do
+                        error("agent failed")
+                    end
+                    @test mounts == original_mounts
+                end
+            end
+
+            # Resolve the active hooks directory through Git, including a
+            # repository's custom core.hooksPath, rather than assuming .git/hooks.
+            custom_hooks = joinpath(repo, "custom hooks")
+            mkpath(custom_hooks)
+            run(`git -C $repo config core.hooksPath $custom_hooks`)
+            mounts = Dict(repo => ClaudeBox.Sandbox.MountInfo(repo, ClaudeBox.Sandbox.MountType.ReadWrite))
+            ClaudeBox.with_entireio_mounts(state, mounts, cmd -> read(Cmd(cmd; dir=repo), String)) do
+                @test mounts[custom_hooks].type == ClaudeBox.Sandbox.MountType.ReadWrite
+                @test mounts[custom_hooks].host_path != realpath(custom_hooks)
+                @test !haskey(mounts, joinpath(repo, ".git", "hooks"))
+            end
+            for unsafe_hooks in (repo, joinpath(repo, ".git"))
+                run(`git -C $repo config core.hooksPath $unsafe_hooks`)
+                @test_throws r"dedicated Git hooks directory" ClaudeBox.with_entireio_mounts(
+                    () -> error("Must not isolate the working tree or Git database"), state, mounts,
+                    cmd -> read(Cmd(cmd; dir=repo), String))
+            end
+        end
+    end
+
     @testset "Existing Git repository required" begin
         mktempdir() do dir
             calls = Cmd[]

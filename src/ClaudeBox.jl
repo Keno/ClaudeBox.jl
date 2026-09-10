@@ -392,8 +392,8 @@ function print_help()
         --gemini            Use gemini instead of claude
         --opencode          Use opencode instead of claude
         --codex             Use OpenAI codex instead of claude
-        --entireio          Enable local Entire session recording for the selected
-                            agent in an existing Git repository (no Entire login)
+        --entireio          Record the selected agent with Entire for this invocation
+                            only, in an existing Git repository (no Entire login)
 
     Unrecognized flags are passed through to the claude command.
 
@@ -1685,11 +1685,17 @@ EOF"`)
         # Install i686 runtime libraries
         run(exe, config, `/bin/sh -c "mkdir -p /lib/i386-linux-gnu && cp /opt/i686-i686-linux-gnu/gcc/i686-linux-gnu/lib/libstdc++.so.6 /lib/i386-linux-gnu/ && cp /opt/i686-i686-linux-gnu/gcc/i686-linux-gnu/lib/libatomic.so.1 /lib/i386-linux-gnu/"`)
 
-        setup_entireio!(state) do entire_cmd
-            run(exe, config, entire_cmd)
+        read_sandbox_command = function (query)
+            output = IOBuffer()
+            run(exe, Sandbox.SandboxConfig(config; stdout=output), query)
+            return String(take!(output))
         end
-
-        run(exe, interactive_config, cmd)
+        with_entireio_mounts(state, config.mounts, read_sandbox_command) do
+            setup_entireio!(state) do entire_cmd
+                run(exe, config, entire_cmd)
+            end
+            run(exe, interactive_config, cmd)
+        end
     end
 end
 

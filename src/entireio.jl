@@ -42,10 +42,78 @@ function entireio_enable_command(state::AppState)
     return `entire enable --agent $agent --local --skip-push-sessions --telemetry=false --yes`
 end
 
+function entireio_agent_config_dir(state::AppState)
+    state.use_codex && return ".codex"
+    state.use_opencode && return joinpath(".opencode", "plugins")
+    state.use_gemini && return ".gemini"
+    return ".claude"
+end
+
+# Resolve a sandbox path through its most specific mount, then bind a private
+# copy. Explicit bind mounts also work beneath a workspace volume in Docker,
+# where image-based overlays would be hidden by that volume.
+function isolate_entireio_dir!(mounts, path::String, session_dir::String)
+    parents = filter(collect(keys(mounts))) do parent
+        parent == "/" || path == parent || startswith(path, parent * "/")
+    end
+    parent = parents[argmax(length.(parents))]
+    mount = mounts[parent]
+    mount.type == Sandbox.MountType.Overlayed && return
+    source = normpath(joinpath(mount.host_path, relpath(path, parent)))
+    if ispath(source) && !isdir(source)
+        error("--entireio requires a directory at $path")
+    end
+    private_dir = mktempdir(session_dir)
+    if isdir(source)
+        cp(realpath(source), private_dir; force=true, follow_symlinks=false)
+    end
+    mounts[path] = Sandbox.MountInfo(private_dir, Sandbox.MountType.ReadWrite)
+end
+
+"""
+    with_entireio_mounts(f, state, mounts, read_command)
+
+Keep Entire's settings and hook installation private to this sandbox invocation.
+The workspace and Git database stay writable, so recorded checkpoints persist.
+`read_command` resolves Git paths inside the sandbox, including core.hooksPath.
+"""
+function with_entireio_mounts(f::Function, state::AppState, mounts, read_command::Function)
+    state.use_entireio || return f()
+
+    repo_root = try
+        chomp(read_command(`git rev-parse --show-toplevel`))
+    catch err
+        err isa ProcessFailedException || rethrow()
+        error("--entireio requires an existing Git working tree accessible inside the sandbox; use -w to select its root")
+    end
+    hooks_dir = chomp(read_command(`git rev-parse --path-format=absolute --git-path hooks`))
+    git_dirs = split(chomp(read_command(`git rev-parse --path-format=absolute --git-common-dir --git-dir`)), '\n')
+    if any((repo_root, git_dirs...)) do persistent_path
+        persistent_path == hooks_dir || startswith(persistent_path, hooks_dir * "/")
+    end
+        error("--entireio requires a dedicated Git hooks directory; core.hooksPath must not contain the working tree or Git database")
+    end
+    original_mounts = copy(mounts)
+    mktempdir() do session_dir
+        try
+            for path in (joinpath(repo_root, ".entire"),
+                         joinpath(repo_root, entireio_agent_config_dir(state)),
+                         hooks_dir)
+                isolate_entireio_dir!(mounts, String(path), session_dir)
+            end
+            return f()
+        finally
+            empty!(mounts)
+            merge!(mounts, original_mounts)
+        end
+    end
+end
+
 """
     setup_entireio!(run_command, state)
 
 Install Entire if necessary and enable recording before launching the agent.
+Call inside `with_entireio_mounts` so the settings and hooks do not reach the host.
 `run_command` executes a command in the configured sandbox's working directory.
 """
 function setup_entireio!(run_command::Function, state::AppState)
@@ -65,6 +133,6 @@ function setup_entireio!(run_command::Function, state::AppState)
         run_command(entireio_install_command())
     end
 
-    cprintln(CYAN, "Enabling local Entire recording for $(entireio_agent(state))...")
+    cprintln(CYAN, "Enabling Entire recording for this invocation ($(entireio_agent(state)))...")
     run_command(entireio_enable_command(state))
 end
