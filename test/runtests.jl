@@ -243,6 +243,8 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         end
     end
 
+    include("entireio.jl")
+
     # Skip tests requiring full environment setup in CI (requires JuliaHub authentication)
     if !IS_CI
     @testset "Git Config in Sandbox" begin

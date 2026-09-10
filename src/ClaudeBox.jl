@@ -78,7 +78,10 @@ mutable struct AppState
     use_codex::Bool
     preserve_path::Bool
     kvm::Bool
+    use_entireio::Bool
 end
+
+include("entireio.jl")
 
 """
     main(args=ARGS)
@@ -154,7 +157,7 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"], options["profile"], options["kvm"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"], options["profile"], options["kvm"]; use_entireio=options["entireio"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
@@ -274,6 +277,7 @@ function parse_args(args::Vector{String})
         "codex" => false,
         "preserve" => false,
         "kvm" => false,
+        "entireio" => false,
         "profile" => nothing,
         "claude_args" => String[]
     )
@@ -307,6 +311,8 @@ function parse_args(args::Vector{String})
             options["preserve"] = true
         elseif arg == "--kvm"
             options["kvm"] = true
+        elseif arg == "--entireio"
+            options["entireio"] = true
         elseif arg == "--profile"
             if i < length(args)
                 i += 1
@@ -386,6 +392,8 @@ function print_help()
         --gemini            Use gemini instead of claude
         --opencode          Use opencode instead of claude
         --codex             Use OpenAI codex instead of claude
+        --entireio          Enable local Entire session recording for the selected
+                            agent in an existing Git repository (no Entire login)
 
     Unrecognized flags are passed through to the claude command.
 
@@ -422,7 +430,7 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false, claude_profile::Union{String, Nothing}=nothing, kvm::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false, claude_profile::Union{String, Nothing}=nothing, kvm::Bool=false; use_entireio::Bool=false)::AppState
     if !isnothing(claude_profile)
         claude_profile = validate_profile_name(claude_profile)
     end
@@ -477,7 +485,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_profile, claude_home_dir, claude_json_path, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, tokens.expires_at, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path, kvm)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_profile, claude_home_dir, claude_json_path, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, tokens.expires_at, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path, kvm, use_entireio)
 end
 
 """
@@ -1285,6 +1293,12 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         mounts["/dev/kvm"] = Sandbox.MountInfo("/dev/kvm", Sandbox.MountType.ReadWrite)
     end
 
+    if state.use_entireio
+        entireio_config_dir = joinpath(state.claude_prefix, "entireio")
+        mkpath(entireio_config_dir)
+        mounts["/root/.config/entire"] = Sandbox.MountInfo(entireio_config_dir, Sandbox.MountType.ReadWrite)
+    end
+
     # Add claude_sandbox repository if available
     if !isnothing(state.claude_sandbox_dir) && isdir(state.claude_sandbox_dir)
         mounts["/root/.claude_sandbox"] = Sandbox.MountInfo(state.claude_sandbox_dir, Sandbox.MountType.ReadWrite)
@@ -1387,6 +1401,13 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
         "JULIA_DEPOT_PATH" => "/root/.julia:",
         "IS_SANDBOX" => "1"
     )
+
+    if state.use_entireio
+        env["ENTIRE_NO_AUTO_UPDATE"] = "1"
+        # A sandbox has no desktop keyring; allow an optional manual login to
+        # persist in the mounted config directory. Recording itself needs none.
+        env["ENTIRE_TOKEN_STORE"] = "file"
+    end
 
     # Add toolchain environment variables if toolchain is installed
     if !isempty(readdir(state.toolchain_dir))
@@ -1663,6 +1684,10 @@ EOF"`)
         run(exe, config, `/bin/sh -c "cp /opt/bb2-x86_64-linux-gnu/gcc/x86_64-linux-gnu/lib64/libstdc++.so.6 /lib/x86_64-linux-gnu/; cp /opt/bb2-x86_64-linux-gnu/gcc/x86_64-linux-gnu/lib64/libatomic.so.1 /lib/x86_64-linux-gnu/"`)
         # Install i686 runtime libraries
         run(exe, config, `/bin/sh -c "mkdir -p /lib/i386-linux-gnu && cp /opt/i686-i686-linux-gnu/gcc/i686-linux-gnu/lib/libstdc++.so.6 /lib/i386-linux-gnu/ && cp /opt/i686-i686-linux-gnu/gcc/i686-linux-gnu/lib/libatomic.so.1 /lib/i386-linux-gnu/"`)
+
+        setup_entireio!(state) do entire_cmd
+            run(exe, config, entire_cmd)
+        end
 
         run(exe, interactive_config, cmd)
     end
