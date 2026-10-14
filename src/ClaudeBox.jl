@@ -1624,7 +1624,7 @@ alias l='ls -CF'
                 cli_cmd = build_cli_command(state; use_full_path=false)
 
                 # Convert to shell string for bash
-                full_command = Base.shell_escape(cli_cmd)
+                full_command = Base.shell_escape_posixly(cli_cmd)
 
                 # Get cli name and base command for display
                 cli_name = if state.use_codex
