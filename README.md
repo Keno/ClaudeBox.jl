@@ -122,6 +122,19 @@ This is opt-in and requires the host to have a working `/dev/kvm` (KVM kernel
 module loaded; on cloud VMs, nested virtualization must be enabled). ClaudeBox
 errors out early if `--kvm` is given but the host has no `/dev/kvm`.
 
+### Git Worktrees
+
+If the workspace is a `git worktree`, its `.git` file points at a gitdir (and
+the shared common dir of the main repository) that live outside the workspace.
+ClaudeBox mounts those directories at their original host paths so git works
+inside the sandbox. By default they are mounted read-only, which lets the
+sandbox read branches and objects but prevents it from committing, fetching, or
+otherwise modifying the shared repository. To allow writes (e.g. so the sandbox
+can commit and push from the worktree):
+```bash
+./bin/claudebox --worktree-rw
+```
+
 ### Help
 
 ```bash

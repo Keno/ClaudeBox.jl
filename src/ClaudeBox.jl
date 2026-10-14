@@ -129,6 +129,7 @@ mutable struct AppState
     use_codex::Bool
     preserve_path::Bool
     kvm::Bool
+    worktree_rw::Bool
 end
 
 """
@@ -205,7 +206,7 @@ function _main(args::Vector{String})::Cint
     end
 
     # Initialize application state
-    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"], options["profile"], options["kvm"])
+    state = initialize_state(options["work_dir"], options["claude_args"], options["bash"], options["dangerous_github_auth"], options["gemini"], options["opencode"], options["codex"], options["preserve"], options["profile"], options["kvm"], options["worktree_rw"])
 
     # Handle GitHub authentication (enabled by default)
     if !options["no_github_auth"]
@@ -325,6 +326,7 @@ function parse_args(args::Vector{String})
         "codex" => false,
         "preserve" => false,
         "kvm" => false,
+        "worktree_rw" => false,
         "profile" => nothing,
         "claude_args" => String[]
     )
@@ -358,6 +360,8 @@ function parse_args(args::Vector{String})
             options["preserve"] = true
         elseif arg == "--kvm"
             options["kvm"] = true
+        elseif arg == "--worktree-rw"
+            options["worktree_rw"] = true
         elseif arg == "--profile"
             if i < length(args)
                 i += 1
@@ -434,6 +438,9 @@ function print_help()
         --kvm               Pass /dev/kvm through to the sandbox (enables
                             hardware virtualization: firecracker, QEMU-KVM,
                             rr inside guests)
+        --worktree-rw       When the workspace is a git worktree, mount its
+                            external gitdir (and the shared common dir)
+                            read-write instead of read-only
         --gemini            Use gemini instead of claude
         --opencode          Use opencode instead of claude
         --codex             Use OpenAI codex instead of claude
@@ -473,7 +480,7 @@ function print_help()
     """)
 end
 
-function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false, claude_profile::Union{String, Nothing}=nothing, kvm::Bool=false)::AppState
+function initialize_state(work_dir::String, claude_args::Vector{String}=String[], keep_bash::Bool=false, dangerous_github_auth::Bool=false, use_gemini::Bool=false, use_opencode::Bool=false, use_codex::Bool=false, preserve_path::Bool=false, claude_profile::Union{String, Nothing}=nothing, kvm::Bool=false, worktree_rw::Bool=false)::AppState
     if !isnothing(claude_profile)
         claude_profile = validate_profile_name(claude_profile)
     end
@@ -528,7 +535,7 @@ function initialize_state(work_dir::String, claude_args::Vector{String}=String[]
     # Load existing GitHub tokens if available
     tokens = load_github_tokens(claude_prefix, dangerous_github_auth)
 
-    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_profile, claude_home_dir, claude_json_path, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, tokens.expires_at, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path, kvm)
+    return AppState(tools_prefix, claude_prefix, julia_depot_prefix, nodejs_dir, npm_dir, gh_cli_dir, build_tools_dir, toolchain_dir, juliaup_dir, julia_dir, claude_profile, claude_home_dir, claude_json_path, gemini_home_dir, opencode_home_dir, codex_home_dir, local_dir, work_dir, claude_installed, gemini_installed, opencode_installed, codex_installed, tokens.access_token, tokens.refresh_token, tokens.expires_at, claude_args, keep_bash, nothing, dangerous_github_auth, use_gemini, use_opencode, use_codex, preserve_path, kvm, worktree_rw)
 end
 
 """
@@ -1347,16 +1354,21 @@ function create_sandbox_config(state::AppState; stdin=Base.devnull, stdout=Base.
     end
 
     # If the workspace is a git worktree, its `.git` file points at a gitdir (and
-    # shared common dir) that live outside the workspace. Mount them read-only at
-    # their original host paths so git resolves the worktree inside the sandbox.
+    # shared common dir) that live outside the workspace. Mount them at their
+    # original host paths so git resolves the worktree inside the sandbox. They
+    # are read-only by default (so the sandbox can read refs/objects but cannot
+    # commit, fetch, or otherwise modify the shared repository); --worktree-rw
+    # mounts them read-write instead.
+    worktree_mount_type = state.worktree_rw ? Sandbox.MountType.ReadWrite : Sandbox.MountType.ReadOnly
+    worktree_mount_desc = state.worktree_rw ? "read-write" : "read-only"
     for gitpath in git_worktree_gitdirs(state.work_dir)
         # Skip anything already covered by an existing (non-root) mount. The
         # root mount "/" is excluded: every mount is nested under it, so it would
         # spuriously "cover" every absolute path.
         covered = any(p -> p != "/" && (gitpath == p || startswith(gitpath, rstrip(p, '/') * "/")), keys(mounts))
         if !covered
-            mounts[gitpath] = Sandbox.MountInfo(gitpath, Sandbox.MountType.ReadOnly)
-            cprintln(CYAN, "📁 Mounting git worktree directory (read-only): $gitpath")
+            mounts[gitpath] = Sandbox.MountInfo(gitpath, worktree_mount_type)
+            cprintln(CYAN, "📁 Mounting git worktree directory ($worktree_mount_desc): $gitpath")
         end
     end
 

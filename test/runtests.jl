@@ -59,6 +59,14 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         options = ClaudeBox.parse_args(String[])
         @test options["kvm"] == false
 
+        # Test worktree-rw parsing
+        options = ClaudeBox.parse_args(String["--worktree-rw"])
+        @test options["worktree_rw"] == true
+
+        # Test worktree-rw default is false
+        options = ClaudeBox.parse_args(String[])
+        @test options["worktree_rw"] == false
+
         # Test profile parsing
         options = ClaudeBox.parse_args(String["--profile", "work"])
         @test options["profile"] == "work"
@@ -131,6 +139,11 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
         @test state.kvm == false
         state_kvm = ClaudeBox.initialize_state(pwd(), String[], false, false, false, false, false, false, nothing, true)
         @test state_kvm.kvm == true
+
+        # Test git worktree gitdir mounts are read-only by default and can be made read-write
+        @test state.worktree_rw == false
+        state_wt_rw = ClaudeBox.initialize_state(pwd(), String[], false, false, false, false, false, false, nothing, false, true)
+        @test state_wt_rw.worktree_rw == true
 
         # Test Codex history is separated by workspace under the selected Codex root.
         @test ClaudeBox.codex_workspace_history_name("/tmp/my-project") == "-tmp-my-project"
@@ -350,6 +363,32 @@ const IS_CI = haskey(ENV, "JULIA_PKGTEST") || haskey(ENV, "CI")
                     @test ClaudeBox.host_git_config("user.signingkey") === nothing
                 end
             end
+        end
+    end
+
+    @testset "Git Worktree Mount Type" begin
+        # A workspace that is a git worktree gets its external common dir
+        # mounted read-only by default, and read-write with --worktree-rw.
+        mktempdir() do root
+            gitdir = joinpath(root, "main", ".git", "worktrees", "wt1")
+            common = joinpath(root, "main", ".git")
+            wt = joinpath(root, "wt")
+            mkpath(gitdir)
+            mkpath(wt)
+            write(joinpath(wt, ".git"), "gitdir: $gitdir\n")
+            write(joinpath(gitdir, "commondir"), "../..\n")
+
+            state_ro = ClaudeBox.initialize_state(wt)
+            config_ro = ClaudeBox.create_sandbox_config(state_ro)
+            @test haskey(config_ro.mounts, common)
+            @test config_ro.mounts[common].host_path == common
+            @test config_ro.mounts[common].type == Sandbox.MountType.ReadOnly
+
+            state_rw = ClaudeBox.initialize_state(wt, String[], false, false, false, false, false, false, nothing, false, true)
+            config_rw = ClaudeBox.create_sandbox_config(state_rw)
+            @test haskey(config_rw.mounts, common)
+            @test config_rw.mounts[common].host_path == common
+            @test config_rw.mounts[common].type == Sandbox.MountType.ReadWrite
         end
     end
 
